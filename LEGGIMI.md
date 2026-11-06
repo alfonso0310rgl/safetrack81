@@ -125,7 +125,7 @@ Ogni mattina verso le 7, quando una scadenza di un'azienda entra nei 30 giorni, 
 - **Firma**: è quella dell'intestazione del gestionale. Le risposte dell'azienda arrivano all'email dell'intestazione, che riceve anche una copia in CC.
 - **Frequenza**: ogni scadenza viene comunicata una sola volta. Se un'azienda non ha scadenze nuove, non riceve nulla.
 - **Attivazione**: dal titolare, in **⚙️ Account → Invio automatico alle aziende**. È spento di default.
-- **Esclusioni**: si può escludere una singola azienda dalla sua scheda **🔔 Scadenze**, con l'interruttore "Invio automatico" accanto al pulsante email. Passando il mouse sull'interruttore si vede la data dell'ultimo invio.
+- **Esclusioni**: si può escludere una singola azienda dalla sua scheda **🔔 Scadenze**, interruttore "Per questa azienda". Lì si vede anche la data dell'ultimo invio automatico.
 
 ## Da sapere
 - **Backup automatico**: ogni giorno viene salvata una copia nel database (tabella `backup`) e vengono tenuti gli ultimi 30 giorni. Puoi sempre fare anche **📥 Esporta**.
