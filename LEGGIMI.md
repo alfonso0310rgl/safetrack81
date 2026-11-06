@@ -7,7 +7,7 @@ Il programma è composto da 3 file:
 
 Come funziona:
 - Il cliente apre il sito, preme **Registrati** e crea il suo account.
-- L'account resta **in attesa** finché non lo attivi tu dal pannello **👑 Clienti e abbonamenti**, scegliendo il piano e la scadenza.
+- L'account resta **in attesa** finché non lo attivi tu dalla sezione **👥 Clienti e abbonati**, scegliendo il piano e la scadenza.
 - Alla scadenza l'accesso si blocca da solo. I dati del cliente restano conservati e ricompaiono appena rinnovi.
 - Ogni cliente ha il suo gestionale, invisibile agli altri. Può aggiungere colleghi, che lavorano sugli stessi dati in tempo reale.
 
@@ -53,7 +53,8 @@ Come funziona:
    - un file `backup_AAAA-MM-GG.json` della cartella `SafeTrack81_Dati/backup`.
 
 ## 6. Gestire clienti e abbonamenti
-- **👑 Clienti e abbonamenti** elenca tutti gli iscritti con nome, azienda, telefono e data di registrazione. Il numero rosso indica quanti sono in attesa.
+- **Link da mandare ai nuovi clienti**: `https://alfonso0310rgl.github.io/safetrack81/#registrati`. Apre direttamente la pagina di registrazione, dove il cliente inserisce i dati del referente e dell'azienda (P.IVA e indirizzo compresi) e l'email su cui riceverà gli avvisi. Lo trovi anche, con il pulsante **Copia link**, nella sezione **👥 Clienti e abbonati**.
+- La sezione **👥 Clienti e abbonati** (in alto) elenca tutti gli iscritti con nome, azienda, telefono e data di registrazione. Il numero rosso indica quanti sono in attesa.
 - **+1 mese / +1 anno**: attiva o rinnova. Se l'abbonamento è ancora valido, il periodo si aggiunge alla scadenza attuale, così il cliente non perde giorni.
 - **Salva**: imposta piano, data e note a mano (es. "pagato con bonifico il…"). Va bene anche per una prova gratuita.
 - **Sospendi**: blocca subito l'accesso, i dati restano conservati.

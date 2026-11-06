@@ -53,13 +53,21 @@ create table if not exists public.profili (
 
 alter table public.aziende add column if not exists scadenze jsonb;           -- elenco scadenze calcolato dall'app
 alter table public.profili add column if not exists avvisi_email boolean not null default true;
+alter table public.profili add column if not exists cognome   text;
+alter table public.profili add column if not exists piva      text;
+alter table public.profili add column if not exists indirizzo text;
+alter table public.profili add column if not exists cap       text;
+alter table public.profili add column if not exists citta     text;
+alter table public.profili add column if not exists provincia text;
 
 -- crea il profilo in automatico a ogni nuova registrazione
 create or replace function public.nuovo_utente() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profili (user_id, email, nome, azienda, telefono)
-  values (new.id, new.email, new.raw_user_meta_data->>'nome', new.raw_user_meta_data->>'azienda', new.raw_user_meta_data->>'telefono')
+  insert into public.profili (user_id, email, nome, cognome, azienda, piva, indirizzo, cap, citta, provincia, telefono)
+  values (new.id, new.email, new.raw_user_meta_data->>'nome', new.raw_user_meta_data->>'cognome', new.raw_user_meta_data->>'azienda',
+          new.raw_user_meta_data->>'piva', new.raw_user_meta_data->>'indirizzo', new.raw_user_meta_data->>'cap',
+          new.raw_user_meta_data->>'citta', upper(new.raw_user_meta_data->>'provincia'), new.raw_user_meta_data->>'telefono')
   on conflict (user_id) do nothing;
   return new;
 end $$;
@@ -163,15 +171,16 @@ language sql security definer set search_path = public as $$
 $$;
 
 -- elenco utenti per il pannello amministratore
+drop function if exists public.admin_lista_utenti();
 create or replace function public.admin_lista_utenti()
-returns table (user_id uuid, email text, nome text, azienda text, telefono text, piano text, scadenza date,
-               admin boolean, note text, registrato_il timestamptz, gestionali text, ultimo_accesso timestamptz)
+returns table (user_id uuid, email text, nome text, cognome text, azienda text, piva text, indirizzo text, cap text, citta text, provincia text,
+               telefono text, piano text, scadenza date, admin boolean, note text, registrato_il timestamptz, gestionali text, ultimo_accesso timestamptz)
 language plpgsql security definer stable set search_path = public as $$
 begin
   if not public.is_admin() then raise exception 'Solo l''amministratore'; end if;
   return query
-    select p.user_id, coalesce(p.email, u.email::text), p.nome, p.azienda, p.telefono, p.piano, p.scadenza,
-           p.admin, p.note, p.registrato_il,
+    select p.user_id, coalesce(p.email, u.email::text), p.nome, p.cognome, p.azienda, p.piva, p.indirizzo, p.cap, p.citta, p.provincia,
+           p.telefono, p.piano, p.scadenza, p.admin, p.note, p.registrato_il,
            (select string_agg(sp.nome || case when m.ruolo = 'titolare' then '' else ' (collega)' end, ', ')
               from public.membri m join public.spazi sp on sp.id = m.spazio_id where m.user_id = p.user_id),
            u.last_sign_in_at
@@ -528,12 +537,12 @@ begin
     if n > 0 then
       ogg := 'SafeTrack 81 — ' || n || case when n = 1 then ' scadenza' else ' scadenze' end || ' da controllare (' || sp.nome || ')';
       html := format('<div style="font-family:Arial,sans-serif;color:#111827;max-width:760px;">
-        <div style="background:#1e2642;color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;font-size:18px;font-weight:700;">🛡️ SafeTrack 81 — Avviso scadenze</div>
+        <div style="background:#2e231b;color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;font-size:18px;font-weight:700;">🛡️ SafeTrack 81 — Avviso scadenze</div>
         <div style="padding:16px 20px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
         <p style="font-size:14px;margin:0 0 12px;">Nel gestionale <strong>%s</strong> ci sono %s nuove scadenze da controllare:</p>
         <table style="border-collapse:collapse;width:100%%;"><tr style="background:#f3f4f6;text-align:left;">
         <th style="%s">Azienda</th><th style="%s">Scadenza</th><th style="%s">Persona</th><th style="%s">Data</th><th style="%s">Stato</th></tr>%s</table>
-        <p style="margin:18px 0 6px;"><a href="%s" style="background:#2f6ef5;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Apri il gestionale</a></p>
+        <p style="margin:18px 0 6px;"><a href="%s" style="background:#b8571d;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Apri il gestionale</a></p>
         <p style="font-size:11px;color:#6b7280;margin-top:16px;">Ogni scadenza viene segnalata a 30 giorni, a 7 giorni e quando scade. Puoi disattivare queste email da ⚙️ Account e colleghi.</p>
         </div></div>', public.st81_html(sp.nome), n, td, td, td, td, td, righe, coalesce(url, '#'));
       if sp.telegram_chat_id is not null then

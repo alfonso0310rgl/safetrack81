@@ -4,42 +4,47 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SafeTrack 81 — Gestione Sicurezza</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root {
-    --bg: #f4f6fa;
+    --bg: #f8f4ee;
     --bg2: #ffffff;
-    --bg3: #f0f2f7;
-    --bg4: #e4e8f0;
-    --border: rgba(0,0,0,0.08);
-    --border2: rgba(0,0,0,0.13);
-    --text: #1a1d2e;
-    --text2: #505570;
-    --text3: #9098b4;
-    --accent: #2f6ef5;
-    --accent2: #1a52d0;
-    --green: #16a34a;
-    --orange: #d97706;
-    --red: #dc2626;
-    --red2: #b91c1c;
-    --sidebar: #1e2540;
-    --sidebar-text: #c8cfe8;
-    --sidebar-text2: #8490b8;
-    --sidebar-border: rgba(255,255,255,0.07);
-    --radius2: 12px;
+    --bg3: #f4eee5;
+    --bg4: #e9e0d3;
+    --border: rgba(74,52,32,0.09);
+    --border2: rgba(74,52,32,0.16);
+    --text: #2b2119;
+    --text2: #6a5a4b;
+    --text3: #a2917f;
+    --accent: #b8571d;
+    --accent2: #96440f;
+    --accent-soft: #f8e8da;
+    --green: #4f7a3a;
+    --orange: #c98a0b;
+    --yellow-soft: #fdf3d8;
+    --red: #b42318;
+    --red2: #8f1c13;
+    --red-soft: #fbe6e2;
+    --sidebar: #2e231b;
+    --sidebar-text: #eadfce;
+    --sidebar-text2: #a8957f;
+    --sidebar-border: rgba(255,240,220,0.08);
+    --radius2: 14px;
     font-size: 14px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
-  .app { display: flex; height: 100vh; overflow: hidden; }
-  .sidebar { width: 256px; min-width: 256px; background: var(--sidebar); display: flex; flex-direction: column; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .app-body { display: flex; flex: 1; min-height: 0; }
+  .sidebar { width: 264px; min-width: 264px; background: var(--sidebar); display: flex; flex-direction: column; overflow: hidden; }
   .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; background: var(--bg); }
 
   /* SIDEBAR */
   .sidebar-header { padding: 18px 16px 14px; border-bottom: 1px solid var(--sidebar-border); }
   .logo { font-size: 17px; font-weight: 800; color: #fff; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 9px; }
-  .logo:hover { color: #a8c0ff; }
+  .logo:hover { color: #f3c9a5; }
   .logo-icon { width: 34px; height: 34px; background: var(--accent); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
   .logo-sub { color: var(--sidebar-text2); font-weight: 400; font-size: 11px; display: block; margin-top: 1px; }
   .sidebar-search { padding: 10px 10px 4px; }
@@ -52,12 +57,12 @@
   .sidebar-list { flex: 1; overflow-y: auto; padding: 2px 8px; }
   .sidebar-item { padding: 9px 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s; color: var(--sidebar-text); }
   .sidebar-item:hover { background: rgba(255,255,255,0.08); }
-  .sidebar-item.active { background: var(--accent); color: #fff; }
+  .sidebar-item.active { background: rgba(232,140,80,0.22); color: #fff; box-shadow: inset 3px 0 0 #e8925a; }
   .sidebar-item .cn { font-size: 13px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .dot-red { background: #f87171; }
-  .dot-orange { background: #fbbf24; }
-  .dot-green { background: #4ade80; }
+  .dot-red { background: #e5674f; }
+  .dot-orange { background: #e8b23a; }
+  .dot-green { background: #8db36f; }
   .dot-gray { background: var(--sidebar-text2); }
   .sidebar-footer { padding: 12px; border-top: 1px solid var(--sidebar-border); display: flex; flex-direction: column; gap: 7px; }
   .btn-add-company { width: 100%; padding: 9px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background 0.15s; }
@@ -77,7 +82,7 @@
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
   .topbar-actions { display: flex; gap: 8px; }
-  .btn { padding: 7px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn { padding: 8px 15px; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
   .btn-primary { background: var(--accent); color: white; }
   .btn-primary:hover { background: var(--accent2); }
   .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); }
@@ -113,15 +118,15 @@
   th { padding: 9px 16px; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--bg3); }
   td { padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #f6f8ff; }
+  tr:hover td { background: #fbf7f1; }
 
   /* CHIPS */
   .chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-  .cr { background: #fee2e2; color: #dc2626; }
-  .co { background: #fef3c7; color: #b45309; }
+  .cr { background: var(--red-soft); color: var(--red); }
+  .co { background: var(--yellow-soft); color: #9a6a06; }
   .cg { background: #dcfce7; color: #15803d; }
   .cx { background: var(--bg4); color: var(--text3); }
-  .cb { background: #dbeafe; color: #1d4ed8; }
+  .cb { background: #f8e8da; color: #96440f; }
 
   /* SWITCH */
   .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
@@ -140,7 +145,7 @@
   .fr3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
   label { display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 5px; }
   input[type=text], input[type=email], input[type=password], input[type=date], input[type=number], select, textarea { width: 100%; padding: 9px 12px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; transition: border 0.15s, box-shadow 0.15s; }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,110,245,0.1); }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(184,87,29,0.14); }
   select option { background: #fff; }
   .fa { display: flex; gap: 8px; justify-content: flex-end; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
   .mc { position: absolute; top: 16px; right: 16px; background: var(--bg3); border: none; color: var(--text2); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
@@ -179,8 +184,8 @@
   .sede-line span { font-weight: 700; color: var(--text3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; }
   .add-btn-small { background: var(--bg3); border: 1px solid var(--border2); color: var(--text2); padding: 6px 12px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s; }
   .add-btn-small:hover { background: var(--bg4); color: var(--text); }
-  .add-btn-small.acc { background: #dbeafe; color: var(--accent); border-color: #bfdbfe; }
-  .add-btn-small.acc:hover { background: #bfdbfe; }
+  .add-btn-small.acc { background: #f8e8da; color: var(--accent); border-color: #efd3bb; }
+  .add-btn-small.acc:hover { background: #efd3bb; }
   .no-items { padding: 18px; text-align: center; color: var(--text3); font-size: 13px; }
   .dip-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); }
   .dip-row:last-child { border-bottom: none; }
@@ -205,13 +210,13 @@
   /* GRUPPO CHECKLIST */
   .dip-checklist { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; border: 1px solid var(--border2); border-radius: 8px; padding: 6px; background: var(--bg3); }
   .dci { display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: background 0.1s; user-select: none; }
-  .dci:hover { background: rgba(47,110,245,0.07); }
+  .dci:hover { background: rgba(184,87,29,0.07); }
   .dci input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; pointer-events: none; }
   .dci label { font-size: 13px; font-weight: 500; color: var(--text); text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer; pointer-events: none; flex: 1; }
   .ca { display: flex; gap: 8px; margin-bottom: 6px; }
   .ca button { background: var(--bg4); border: 1px solid var(--border2); color: var(--text2); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; }
   .ca button:hover { background: var(--border2); }
-  .info-hint { font-size: 11px; color: var(--text2); background: #eff6ff; border-radius: 6px; padding: 7px 10px; margin-bottom: 14px; border-left: 3px solid var(--accent); }
+  .info-hint { font-size: 11px; color: var(--text2); background: #fbf1e7; border-radius: 6px; padding: 7px 10px; margin-bottom: 14px; border-left: 3px solid var(--accent); }
   /* HOME PER AZIENDA */
   .home-az { margin-bottom: 16px; }
   .home-az-h { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--bg3); }
@@ -240,30 +245,127 @@
   .admin-tab td { padding:10px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
   .admin-tab input, .admin-tab select { padding:6px 8px; font-size:12px; }
   .sync-stato { font-size: 11px; color: var(--sidebar-text); text-align: center; padding: 2px 0 4px; }
+
+  /* ===== HEADER APP ===== */
+  .apphead { height: 64px; min-height: 64px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 18px; padding: 0 20px; box-shadow: 0 1px 0 rgba(74,52,32,0.03); z-index: 20; }
+  .ah-logo { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; min-width: 224px; }
+  .ah-mark { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg,#c8662a,#8f3f12); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; box-shadow: 0 3px 10px rgba(184,87,29,0.3); }
+  .ah-name { font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: -0.2px; }
+  .ah-sub { font-size: 11px; color: var(--text3); font-weight: 500; }
+  .ah-nav { display: flex; gap: 8px; flex: 1; }
+  .navbox { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 11px; border: 1px solid var(--border); background: var(--bg); color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .navbox:hover { border-color: var(--border2); color: var(--text); background: #fff; }
+  .navbox.active { background: var(--accent-soft); border-color: #efc9a8; color: var(--accent2); }
+  .navbox .nb-ico { font-size: 15px; }
+  .nav-badge { background: var(--red); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 800; }
+  .ah-right { display: flex; align-items: center; gap: 10px; }
+  .ah-stato { font-size: 11px; color: var(--text3); white-space: nowrap; }
+  .ah-user { display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; border: 1px solid var(--border); border-radius: 11px; cursor: pointer; background: #fff; }
+  .ah-user:hover { border-color: var(--border2); }
+  .ah-user-t { display: flex; flex-direction: column; line-height: 1.2; max-width: 190px; }
+  .ah-user-e { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ah-user-p { font-size: 10px; color: var(--text3); }
+  .ah-avatar { width: 30px; height: 30px; border-radius: 9px; background: var(--sidebar); color: #f3c9a5; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .ah-spazio { padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border2); background: #fff; font-size: 12px; font-weight: 600; width: auto; max-width: 200px; }
+  .sidebar-search input[type=text] { background: rgba(255,240,220,0.07); border: 1px solid rgba(255,240,220,0.12); color: #fff; padding: 8px 10px 8px 32px; border-radius: 9px; font-size: 12px; }
+  .sidebar-search input[type=text]:focus { border-color: rgba(232,146,90,0.6); background: rgba(255,240,220,0.11); box-shadow: none; }
+  .ss-wrap::before { left: 11px !important; opacity: .7; }
+  .admin-tab td:first-child { min-width: 270px; }
+  .sb-head { padding: 14px 12px 6px; display: flex; gap: 8px; }
+  .sb-add { width: 100%; padding: 9px; border-radius: 9px; border: 1px dashed rgba(255,230,200,0.28); background: transparent; color: var(--sidebar-text); font-size: 12px; font-weight: 700; cursor: pointer; }
+  .sb-add:hover { background: rgba(255,240,220,0.06); color: #fff; }
+  .sb-count { font-size: 10px; font-weight: 700; color: var(--sidebar-text2); background: rgba(255,240,220,0.08); padding: 1px 7px; border-radius: 10px; margin-left: 6px; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .page-title { font-size: 22px; font-weight: 800; letter-spacing: -0.3px; color: var(--text); }
+  .page-sub { font-size: 13px; color: var(--text3); margin-top: 3px; }
+  /* ===== HOME SCADENZE ===== */
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
+  .kpi { background: #fff; border: 1px solid var(--border); border-radius: var(--radius2); padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
+  .kpi-ico { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 19px; }
+  .kpi-v { font-size: 26px; font-weight: 800; line-height: 1; }
+  .kpi-l { font-size: 12px; color: var(--text3); margin-top: 4px; font-weight: 500; }
+  .hz { background: #fff; border: 1px solid var(--border); border-radius: var(--radius2); margin-bottom: 12px; overflow: hidden; display: flex; }
+  .hz-bar { width: 5px; flex-shrink: 0; }
+  .hz-in { flex: 1; min-width: 0; }
+  .hz-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 18px; border-bottom: 1px solid var(--border); }
+  .hz-n { font-size: 15px; font-weight: 700; color: var(--text); cursor: pointer; }
+  .hz-n:hover { color: var(--accent); }
+  .hz-r { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+  .hz-r:last-child { border-bottom: none; }
+  .hz-r:hover { background: #fcf8f3; }
+  .hz-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .hz-t { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+  .hz-p { font-weight: 500; color: var(--text2); }
+  .hz-d { font-size: 12px; color: var(--text3); white-space: nowrap; }
+  .hz-badge { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; white-space: nowrap; min-width: 112px; text-align: center; }
+  .hz-badge.r { background: var(--red-soft); color: var(--red); }
+  .hz-badge.y { background: var(--yellow-soft); color: #8a5e05; }
+  .all-ok { background: #fff; border: 1px solid var(--border); border-radius: var(--radius2); padding: 48px 24px; text-align: center; }
+  .all-ok-i { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 18px; background: #eef4e8; color: var(--green); font-size: 30px; display: flex; align-items: center; justify-content: center; }
+  /* ===== PAGINE ===== */
+  .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius2); padding: 22px; }
+  .dati-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .dati-ico { width: 46px; height: 46px; border-radius: 13px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; font-size: 21px; margin-bottom: 14px; }
+  .dati-t { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .dati-d { font-size: 13px; color: var(--text2); line-height: 1.55; margin-bottom: 16px; }
+  .linkbox { display: flex; gap: 8px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 11px; padding: 8px 8px 8px 14px; font-size: 13px; }
+  .linkbox code { flex: 1; color: var(--accent2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* ===== ACCESSO ===== */
+  #authScreen { background: radial-gradient(circle at 20% 10%, #4a3526 0%, #2e231b 55%, #231a14 100%) !important; }
+  .auth-card { border-radius: 20px !important; box-shadow: 0 30px 80px rgba(0,0,0,.35) !important; }
+  .auth-logo { width: 54px; height: 54px; margin: 0 auto 10px; border-radius: 15px; background: linear-gradient(135deg,#c8662a,#8f3f12); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 25px; box-shadow: 0 6px 18px rgba(184,87,29,.35); }
+  /* ===== REGISTRAZIONE ===== */
+  #regScreen { position: fixed; inset: 0; z-index: 310; display: none; background: var(--bg); overflow: auto; }
+  .reg-wrap { min-height: 100%; display: grid; grid-template-columns: minmax(320px, 42%) 1fr; }
+  .reg-side { background: radial-gradient(circle at 15% 0%, #c8662a 0%, #8f3f12 38%, #2e231b 85%); color: #fff; padding: 48px 48px 36px; display: flex; flex-direction: column; }
+  .reg-side h1 { font-size: 32px; line-height: 1.15; font-weight: 800; letter-spacing: -0.6px; margin: 36px 0 14px; }
+  .reg-side p { font-size: 15px; line-height: 1.6; color: #f3dcc8; max-width: 420px; }
+  .reg-feat { list-style: none; margin-top: 30px; display: flex; flex-direction: column; gap: 16px; }
+  .reg-feat li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: #fbeee2; line-height: 1.5; }
+  .reg-feat .ri { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; }
+  .reg-main { display: flex; justify-content: center; padding: 44px 32px; }
+  .reg-form { width: 100%; max-width: 620px; }
+  .reg-form h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.3px; }
+  .reg-sec { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px 6px; margin-bottom: 14px; }
+  .reg-sec-t { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .reg-sec-t span { width: 22px; height: 22px; border-radius: 7px; background: var(--accent-soft); color: var(--accent2); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+  .reg-hint { display: flex; gap: 8px; align-items: flex-start; background: #fdf3e6; border: 1px solid #f2d9bf; color: #7a4a1d; border-radius: 10px; padding: 9px 12px; font-size: 12px; line-height: 1.45; margin: -6px 0 14px; }
+  .fr4 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  @media (max-width: 900px) { .reg-wrap { grid-template-columns: 1fr; } .reg-side { padding: 32px 24px; } .reg-side h1 { font-size: 24px; margin-top: 20px; } .reg-feat { display: none; } .ah-nav .nb-t { display: none; } .ah-logo { min-width: 0; } .ah-sub { display: none; } .kpis { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <div class="logo" onclick="goHome()">
-        <div class="logo-icon">🛡️</div>
-        <div><div>SafeTrack 81</div><span class="logo-sub">D.Lgs. 81/08 Manager</span></div>
-      </div>
+  <header class="apphead">
+    <div class="ah-logo" onclick="goHome()">
+      <div class="ah-mark">🛡️</div>
+      <div><div class="ah-name">SafeTrack 81</div><div class="ah-sub">Scadenze D.Lgs. 81/08</div></div>
     </div>
+    <nav class="ah-nav">
+      <div class="navbox active" id="nav-home" onclick="goHome()"><span class="nb-ico">📋</span><span class="nb-t">Scadenze</span></div>
+      <div class="navbox" id="nav-clienti" onclick="apriAdmin()" style="display:none;"><span class="nb-ico">👥</span><span class="nb-t">Clienti e abbonati</span><span id="adminBadge"></span></div>
+      <div class="navbox" id="nav-dati" onclick="apriDati()"><span class="nb-ico">📦</span><span class="nb-t">Importa / Esporta</span></div>
+    </nav>
+    <div class="ah-right">
+      <div id="syncStato" class="ah-stato"></div>
+      <div id="spazioBox" class="ah-right"></div>
+    </div>
+  </header>
+  <div class="app-body">
+  <aside class="sidebar">
+    <div class="sb-head"><button class="sb-add" onclick="openModal('company')">+ Nuova azienda</button></div>
     <div class="sidebar-search"><div class="ss-wrap"><input type="text" id="sidebarSearch" placeholder="Cerca azienda..." oninput="renderSidebar()"></div></div>
-    <div class="sidebar-section">Aziende</div>
+    <div class="sidebar-section">Aziende <span class="sb-count" id="sbCount">0</span></div>
     <div class="sidebar-list" id="sidebarList"></div>
-    <div class="sidebar-footer"><button class="btn-add-company" onclick="openModal('company')">+ Nuova Azienda</button><div class="backup-label">💾 Backup dati</div><div class="backup-row"><button class="btn-backup btn-export" onclick="esportaBackup()">📥 Esporta</button><button class="btn-backup btn-import" onclick="document.getElementById('importFile').click()">📤 Importa</button></div><input type="file" id="importFile" accept=".json" style="display:none;" onchange="importaBackup(event)"><div class="backup-label">☁️ Gestionale online</div><div id="syncStato" class="sync-stato"></div><div id="spazioBox" class="spazio-box"></div></div>
-  </div>
+  </aside>
 
-  <div class="main">
+  <main class="main">
     <div id="syncBanner" class="sync-banner" style="display:none;"></div>
     <div id="emptyState" class="content empty-state">
-      <div class="empty-icon">🏢</div>
+      <div class="all-ok-i" style="background:var(--accent-soft);color:var(--accent);">🏢</div>
       <h2>Benvenuto in SafeTrack 81</h2>
-      <p>Aggiungi la tua prima azienda per iniziare a gestire le scadenze D.Lgs. 81/08.</p>
-      <button class="btn btn-primary" style="margin-top:8px;" onclick="openModal('company')">+ Aggiungi Azienda</button>
+      <p>Aggiungi la tua prima azienda oppure importa un backup per iniziare a gestire le scadenze.</p>
+      <div style="display:flex;gap:8px;margin-top:8px;"><button class="btn btn-primary" onclick="openModal('company')">+ Aggiungi azienda</button><button class="btn btn-secondary" onclick="apriDati()">📦 Importa backup</button></div>
     </div>
     <div id="companyView" style="display:none;flex-direction:column;flex:1;">
       <div class="topbar">
@@ -279,17 +381,39 @@
       <div class="content" id="tabContent"></div>
     </div>
     <div id="globalDashboard" style="display:none;flex-direction:column;">
-      <div class="topbar" style="padding:0 24px;">
-        <div style="padding:14px 0;font-size:16px;font-weight:800;color:var(--text);">📊 Dashboard Globale</div>
-      </div>
       <div class="content" id="globalContent"></div>
     </div>
+    <div id="datiPage" style="display:none;" class="content">
+      <div class="page-head"><div><div class="page-title">Importa / Esporta</div><div class="page-sub">Backup e trasferimento dei dati del gestionale</div></div></div>
+      <div class="dati-grid">
+        <div class="card"><div class="dati-ico">📤</div><div class="dati-t">Importa backup</div>
+          <div class="dati-d">Carica un file <strong>.json</strong> creato con "Esporta" o un backup giornaliero. Le aziende con lo stesso codice vengono aggiornate, le nuove aggiunte. Nessuna azienda viene eliminata.</div>
+          <button class="btn btn-primary" id="btnImporta" onclick="document.getElementById('importFile').click()">📤 Scegli file da importare</button>
+          <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importaBackup(event)"></div>
+        <div class="card"><div class="dati-ico">📥</div><div class="dati-t">Esporta backup</div>
+          <div class="dati-d">Scarica una copia completa di tutte le aziende, dipendenti e scadenze in un file <strong>.json</strong>, da conservare sul PC o reimportare.</div>
+          <button class="btn btn-primary" id="btnEsporta" onclick="esportaBackup()">📥 Scarica backup</button></div>
+        <div class="card"><div class="dati-ico">🛟</div><div class="dati-t">Backup automatico</div>
+          <div class="dati-d">Ogni giorno viene salvata automaticamente una copia online dei dati. Vengono conservati gli ultimi 30 giorni: in caso di necessità possiamo ripristinare una qualsiasi di queste copie.</div></div>
+      </div>
+    </div>
+    <div id="clientiPage" style="display:none;" class="content">
+      <div class="page-head"><div><div class="page-title">Clienti e abbonati</div><div class="page-sub">Attiva, rinnova o sospendi gli accessi dei clienti registrati</div></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><input type="text" placeholder="Cerca nome, email, azienda, P.IVA…" oninput="ADMIN.q=this.value;renderAdmin()" style="width:260px;background:#fff;"><button class="btn btn-secondary" onclick="apriAdmin()" title="Aggiorna">🔄</button></div></div>
+      <div class="card" style="padding:16px 18px;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔗 Link di registrazione per i nuovi clienti</div>
+        <div class="linkbox"><code id="linkReg"></code><button class="btn btn-secondary btn-sm" onclick="copiaLinkReg(this)">Copia link</button></div>
+      </div>
+      <div id="adminFiltri" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
+      <div class="card" style="padding:0 6px;overflow:auto;"><div id="adminLista"></div></div>
+    </div>
+  </main>
   </div>
 </div>
 
 <div id="authScreen" style="display:none;position:fixed;inset:0;z-index:300;background:var(--sidebar);align-items:center;justify-content:center;padding:16px;">
   <div class="auth-card">
-    <div style="font-size:42px;">🛡️</div>
+    <div class="auth-logo">🛡️</div>
     <h3 style="font-size:20px;font-weight:800;margin:6px 0 2px;">SafeTrack 81</h3>
     <div style="font-size:12px;color:var(--text3);margin-bottom:18px;">Gestione scadenze D.Lgs. 81/08</div>
     <form id="authLogin" onsubmit="eseguiLogin(event)">
@@ -297,18 +421,7 @@
       <div class="fg"><label>Password</label><input type="password" id="authPw" autocomplete="current-password" required></div>
       <button type="submit" id="authBtn" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;">Accedi</button>
       <button type="button" onclick="passwordDimenticata()" style="background:none;border:none;color:var(--accent);font-size:12px;margin-top:12px;cursor:pointer;">Password dimenticata?</button>
-      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;font-size:13px;color:var(--text2);">Non hai un account? <a href="#" onclick="mostraAuth('registra');return false;" style="color:var(--accent);font-weight:700;">Registrati</a></div>
-    </form>
-    <form id="authRegistra" onsubmit="eseguiRegistrazione(event)" style="display:none;">
-      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Crea il tuo account. Dopo la registrazione ti contatteremo per attivare il piano.</div>
-      <div class="fg"><label>Nome e cognome *</label><input type="text" id="regNome" autocomplete="name"></div>
-      <div class="fg"><label>Azienda / Studio</label><input type="text" id="regAzienda" autocomplete="organization"></div>
-      <div class="fg"><label>Telefono</label><input type="text" id="regTel" autocomplete="tel"></div>
-      <div class="fg"><label>Email *</label><input type="email" id="regEmail" autocomplete="email"></div>
-      <div class="fg"><label>Password * (min. 6 caratteri)</label><input type="password" id="regPw" autocomplete="new-password"></div>
-      <label style="display:flex;gap:8px;align-items:flex-start;text-align:left;font-size:12px;color:var(--text2);margin:4px 0 14px;cursor:pointer;text-transform:none;letter-spacing:normal;font-weight:400;"><input type="checkbox" id="regPrivacy" style="margin-top:2px;width:auto;"><span>Accetto l'<span id="regPrivacyLink">informativa privacy</span> e il trattamento dei dati per la gestione dell'account.</span></label>
-      <button type="submit" id="regBtn" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;">Crea account</button>
-      <div style="margin-top:14px;font-size:13px;color:var(--text2);">Hai già un account? <a href="#" onclick="mostraAuth('login');return false;" style="color:var(--accent);font-weight:700;">Accedi</a></div>
+      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;font-size:13px;color:var(--text2);">Non hai un account? <a href="#registrati" onclick="mostraAuth('registra');return false;" style="color:var(--accent);font-weight:700;">Registrati</a></div>
     </form>
     <div id="authAttesa" style="display:none;">
       <div id="attesaTitolo" style="font-size:16px;font-weight:800;margin-bottom:8px;"></div>
@@ -329,14 +442,44 @@
   </div>
 </div>
 
-<div id="adminPanel" style="display:none;position:fixed;inset:0;z-index:250;background:rgba(15,23,42,.55);align-items:stretch;justify-content:center;padding:24px;">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:1300px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap;">
-      <div style="font-size:17px;font-weight:800;">👑 Clienti e abbonamenti</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><input type="text" placeholder="Cerca nome, email, azienda…" oninput="ADMIN.q=this.value;renderAdmin()" style="width:240px;"><button class="btn btn-secondary" onclick="apriAdmin()">🔄</button><button class="btn btn-secondary" onclick="chiudiAdmin()">✕ Chiudi</button></div>
+<div id="regScreen">
+  <div class="reg-wrap">
+    <div class="reg-side">
+      <div style="display:flex;align-items:center;gap:10px;"><div class="ah-mark" style="background:rgba(255,255,255,.16);box-shadow:none;">🛡️</div><div style="font-weight:800;font-size:17px;">SafeTrack 81</div></div>
+      <h1>Tutte le scadenze della sicurezza, sotto controllo.</h1>
+      <p>Il gestionale online per DVR, nomine, formazione e idoneità mediche secondo il D.Lgs. 81/08.</p>
+      <ul class="reg-feat">
+        <li><span class="ri">🔔</span><span><strong>Avvisi automatici via email</strong><br>a 30 giorni, a 7 giorni e alla scadenza.</span></li>
+        <li><span class="ri">🏢</span><span><strong>Tutte le tue aziende in un'unica schermata</strong><br>con lo stato aggiornato di ogni adempimento.</span></li>
+        <li><span class="ri">👥</span><span><strong>Lavora con i colleghi</strong><br>sugli stessi dati, in tempo reale, da qualsiasi computer.</span></li>
+        <li><span class="ri">🔒</span><span><strong>Dati protetti</strong><br>ogni account vede solo il proprio gestionale.</span></li>
+      </ul>
+      <div style="margin-top:auto;padding-top:30px;font-size:12px;color:#e2c3a8;" id="regContatti"></div>
     </div>
-    <div id="adminFiltri" style="display:flex;gap:6px;padding:12px 22px;flex-wrap:wrap;"></div>
-    <div id="adminLista" style="flex:1;overflow:auto;padding:0 22px 22px;"></div>
+    <div class="reg-main">
+      <form class="reg-form" onsubmit="eseguiRegistrazione(event)">
+        <h2>Crea il tuo account</h2>
+        <div style="font-size:13px;color:var(--text2);margin:6px 0 20px;">Compila i dati: dopo la registrazione ti contatteremo per attivare il piano scelto.</div>
+        <div class="reg-sec"><div class="reg-sec-t"><span>1</span>Dati del referente</div>
+          <div class="fr"><div><label>Nome *</label><input type="text" id="regNome" autocomplete="given-name"></div><div><label>Cognome *</label><input type="text" id="regCognome" autocomplete="family-name"></div></div>
+          <div class="fg"><label>Telefono</label><input type="text" id="regTel" autocomplete="tel" placeholder="es. 333 1234567"></div>
+        </div>
+        <div class="reg-sec"><div class="reg-sec-t"><span>2</span>Dati dell'azienda</div>
+          <div class="fr"><div><label>Ragione sociale *</label><input type="text" id="regAzienda" autocomplete="organization" placeholder="es. Rossi S.r.l."></div><div><label>Partita IVA / Codice fiscale *</label><input type="text" id="regPiva" placeholder="es. 01234567890"></div></div>
+          <div class="fg"><label>Indirizzo sede</label><input type="text" id="regIndirizzo" autocomplete="street-address" placeholder="Via / Piazza e numero civico"></div>
+          <div class="fr4"><div><label>Città</label><input type="text" id="regCitta" autocomplete="address-level2"></div><div><label>CAP</label><input type="text" id="regCap" autocomplete="postal-code"></div><div><label>Provincia</label><input type="text" id="regProv" maxlength="2" placeholder="es. SA" style="text-transform:uppercase;"></div></div>
+        </div>
+        <div class="reg-sec"><div class="reg-sec-t"><span>3</span>Accesso e avvisi</div>
+          <div class="fg"><label>Email *</label><input type="email" id="regEmail" autocomplete="email" placeholder="nome@azienda.it"></div>
+          <div class="reg-hint"><span>🔔</span><span>Su <strong>questa email</strong> riceverai gli <strong>avvisi automatici delle scadenze</strong> (a 30 giorni, a 7 giorni e alla scadenza) e potrai usarla per accedere. Usa un indirizzo che controlli ogni giorno.</span></div>
+          <div class="fr"><div><label>Password * (min. 6 caratteri)</label><input type="password" id="regPw" autocomplete="new-password"></div><div><label>Ripeti password *</label><input type="password" id="regPw2" autocomplete="new-password"></div></div>
+        </div>
+        <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--text2);margin:6px 2px 18px;cursor:pointer;text-transform:none;letter-spacing:normal;font-weight:400;"><input type="checkbox" id="regPrivacy" style="margin-top:3px;width:auto;"><span>Accetto l'<span id="regPrivacyLink">informativa privacy</span> e il trattamento dei dati per la gestione dell'account.</span></label>
+        <div id="regMsg" style="font-size:13px;min-height:18px;margin-bottom:10px;white-space:pre-line;"></div>
+        <button type="submit" id="regBtn" class="btn btn-primary" style="width:100%;padding:13px;font-size:14px;">Crea account</button>
+        <div style="text-align:center;margin-top:16px;font-size:13px;color:var(--text2);">Hai già un account? <a href="#" onclick="mostraAuth('login');return false;" style="color:var(--accent);font-weight:700;">Accedi</a></div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -428,24 +571,36 @@ function getAllAlerts(company) {
 }
 function dotClass(c) { const a=getAllAlerts(c); if(a.scaduti.length>0) return 'dot-red'; if(a.inScadenza.length>0) return 'dot-orange'; if(c.dipendenti&&c.dipendenti.length>0) return 'dot-green'; return 'dot-gray'; }
 
+// NAVIGAZIONE TRA LE SEZIONI
+let currentPage='home';
+function mostraPagina(nome){
+  currentPage=nome;
+  if(nome!=='azienda'){ currentCompanyId=null; }
+  ['emptyState','companyView','globalDashboard','datiPage','clientiPage'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
+  const show={dati:'datiPage',clienti:'clientiPage'}[nome];
+  if(show) document.getElementById(show).style.display='block';
+  ['home','clienti','dati'].forEach(n=>{ const e=document.getElementById('nav-'+n); if(e) e.classList.toggle('active',n===nome); });
+  renderSidebar();
+  const m=document.querySelector('.main'); if(m) m.scrollTop=0;
+}
+
 // SIDEBAR
 function renderSidebar() {
   const list=document.getElementById('sidebarList');
   const q=(document.getElementById('sidebarSearch')?.value||'').toLowerCase().trim();
-  const filtered=db.aziende.filter(a=>!q||a.nome.toLowerCase().includes(q));
+  const filtered=db.aziende.filter(a=>!q||String(a.nome||'').toLowerCase().includes(q)).sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'it'));
+  const cnt=document.getElementById('sbCount'); if(cnt) cnt.textContent=db.aziende.length;
   if(filtered.length===0){list.innerHTML=`<div style="padding:14px 10px;color:var(--sidebar-text2);font-size:12px;text-align:center;">${q?'Nessun risultato':'Nessuna azienda'}</div>`;return;}
-  list.innerHTML=filtered.map(a=>`<div class="sidebar-item ${a.id===currentCompanyId?'active':''}" onclick="selectCompany('${a.id}')"><span class="dot ${dotClass(a)}"></span><span class="cn">${a.nome}</span></div>`).join('');
+  list.innerHTML=filtered.map(a=>`<div class="sidebar-item ${a.id===currentCompanyId?'active':''}" onclick="selectCompany('${a.id}')"><span class="dot ${dotClass(a)}"></span><span class="cn">${escH(a.nome)}</span></div>`).join('');
 }
 function goHome() {
-  currentCompanyId=null;renderSidebar();
-  document.getElementById('companyView').style.display='none';
-  document.getElementById('emptyState').style.display='none';
+  mostraPagina('home');
   if(db.aziende.length>0) renderGlobalDash(); else document.getElementById('emptyState').style.display='flex';
 }
 function selectCompany(id) {
+  mostraPagina('azienda');
   currentCompanyId=id;currentTab='overview';
-  document.getElementById('emptyState').style.display='none';
-  document.getElementById('globalDashboard').style.display='none';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); const t0=document.getElementById('tab-overview'); if(t0) t0.classList.add('active');
   document.getElementById('companyView').style.display='flex';
   renderSidebar();renderTab();
 }
@@ -680,7 +835,7 @@ function renderNotifiche(c,el){
   all.sort((a,b)=>a.days-b.days);
   const haEmail = !!c.email;
   const btnEmail = haEmail
-    ? `<button onclick="inviaEmailScadenze()" style="background:#dbeafe;color:var(--accent);border:1px solid #bfdbfe;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;">📧 Invia Email Scadenze a ${c.email}</button>`
+    ? `<button onclick="inviaEmailScadenze()" style="background:#f8e8da;color:var(--accent);border:1px solid #efd3bb;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;">📧 Invia Email Scadenze a ${c.email}</button>`
     : `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;">⚠ Nessuna email inserita per questa azienda. <button onclick="openModal('editCompany')" style="background:none;border:none;color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">Aggiungila ora →</button></div>`;
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
@@ -793,7 +948,7 @@ WhatsApp: 0812597443`;
       <p style="margin:0 0 4px 0;">Email: info@studioingegnerialuongo.com</p>
       <p style="margin:0;">WhatsApp: 0812597443</p>
     </div>
-    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-top:14px;">
+    <div style="background:#fbf1e7;border:1px solid #efd3bb;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-top:14px;">
       💡 <strong>Come inviare:</strong> Clicca <em>"Apri Email"</em> — si apre Zoho Mail (o il tuo client email) con tutto già compilato. Premi solo Invio.
     </div>
     <div class="fa" style="gap:10px;">
@@ -850,58 +1005,38 @@ function renderGlobalDash(){
   const gd=document.getElementById('globalDashboard');
   gd.style.display='flex'; gd.style.flexDirection='column';
   const el=document.getElementById('globalContent');
-  let sc=0, wa=0;
+  let nSc=0, nIn=0;
   const groups=[];
   db.aziende.forEach(c=>{
-    const all=getAllDeadlines(c);
-    all.forEach(x=>{ if(x.days<0) sc++; else if(x.days<=30) wa++; });
-    const items=all.filter(x=>x.days<=homeWindow);
-    if(items.length>0 || (c.noteHome||'').trim()) groups.push({c,items});
+    const items=getAllDeadlines(c).filter(x=>x.days!==null&&x.days<=30);
+    if(!items.length) return;
+    items.sort((a,b)=>a.days-b.days);
+    const sc=items.filter(x=>x.days<0).length; nSc+=sc; nIn+=items.length-sc;
+    groups.push({c,items,sc,min:items[0].days});
   });
-  // aziende con la scadenza piu' vicina (o gia' scaduta) per prime
-  groups.sort((a,b)=>{
-    const ka=a.items.length?a.items[0].days:Infinity, kb=b.items.length?b.items[0].days:Infinity;
-    if(ka===kb) return a.c.nome.localeCompare(b.c.nome);
-    return ka-kb;
-  });
-  const winVal=(homeWindow===Infinity)?'all':String(homeWindow);
-  const opt=(val,txt)=>`<option value="${val}" ${winVal===val?'selected':''}>${txt}</option>`;
-  const rowHtml=(c,a)=>{
-    const cls=a.days<0?'urgent':(a.days<=30?'warning':'');
-    const dot=a.days<0?'var(--red)':(a.days<=30?'var(--orange)':'var(--accent)');
-    const dcls=a.days<0?'red':(a.days<=30?'orange':'blue');
-    return `<div class="gni ${cls}" onclick="vaiAScadenza('${c.id}','${a.tab}','${a.modal}','${a.extra}')" style="cursor:pointer;" title="Clicca per aprire e modificare">
-      <div class="gnid" style="background:${dot}"></div>
-      <div class="gnib"><div class="gnit">${escH(a.label)}${a.persona?` <span style="font-weight:500;color:var(--accent);font-size:12px;">— ${escH(a.persona)}</span>`:''}</div><div class="gnis">Scadenza: ${fDate(a.date)}</div></div>
-      <div class="gnid2 ${dcls}">${a.days<0?`–${Math.abs(a.days)}gg`:`${a.days}gg`}</div>
-      <span style="color:var(--text3);font-size:13px;">✎</span>
-    </div>`;
-  };
+  // prima le aziende con le scadenze più vecchie, poi quelle che stanno per scadere
+  groups.sort((a,b)=>(a.min-b.min)||String(a.c.nome).localeCompare(String(b.c.nome),'it'));
+  const badge=d=>d<0?`<span class="hz-badge r">Scaduta da ${Math.abs(d)} ${Math.abs(d)===1?'giorno':'giorni'}</span>`
+    :`<span class="hz-badge y">${d===0?'Scade oggi':d===1?'Scade domani':'Tra '+d+' giorni'}</span>`;
   const gHtml=groups.map(g=>{
-    const c=g.c, nsc=g.items.filter(x=>x.days<0).length;
-    return `<div class="section home-az">
-      <div class="home-az-h">
-        <div class="home-az-n" onclick="selectCompany('${c.id}')" title="Apri l'azienda">🏢 ${escH(c.nome)}</div>
-        <div style="display:flex;gap:6px;">${nsc>0?`<span class="chip cr">${nsc} scadut${nsc===1?'a':'e'}</span>`:''}<span class="chip ${g.items.length?'co':'cg'}">${g.items.length} scadenz${g.items.length===1?'a':'e'}</span></div>
-      </div>
-      ${g.items.length===0?'<div class="no-items" style="padding:12px;">Nessuna scadenza nel periodo selezionato.</div>':`<div class="gnil" style="padding:10px 14px 4px;">${g.items.map(a=>rowHtml(c,a)).join('')}</div>`}
-      <div class="home-note"><label>📝 Note</label><textarea rows="2" placeholder="Appunti su questa azienda..." oninput="salvaNotaHome('${c.id}',this.value)">${escH(c.noteHome)}</textarea></div>
-    </div>`;
+    const c=g.c, nIns=g.items.length-g.sc;
+    return `<div class="hz"><div class="hz-bar" style="background:${g.sc?'var(--red)':'var(--orange)'}"></div><div class="hz-in">
+      <div class="hz-h"><div class="hz-n" onclick="selectCompany('${c.id}')" title="Apri l'azienda">${escH(c.nome)}</div>
+        <div style="display:flex;gap:6px;">${g.sc?`<span class="chip cr">${g.sc} scadut${g.sc===1?'a':'e'}</span>`:''}${nIns?`<span class="chip co">${nIns} in scadenza</span>`:''}</div></div>
+      ${g.items.map(a=>`<div class="hz-r" onclick="vaiAScadenza('${c.id}','${a.tab}','${a.modal}','${a.extra}')" title="Apri e aggiorna questa scadenza">
+        <span class="hz-dot" style="background:${a.days<0?'var(--red)':'var(--orange)'}"></span>
+        <div class="hz-t">${escH(a.label)}${a.persona?` <span class="hz-p">· ${escH(a.persona)}</span>`:''}</div>
+        <div class="hz-d">${fDate(a.date)}</div>${badge(a.days)}</div>`).join('')}
+    </div></div>`;
   }).join('');
-  el.innerHTML=`<div class="stats-grid">
-    <div class="stat-card"><div class="stat-label">Aziende Gestite</div><div class="stat-value sv-blue">${db.aziende.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Documenti Scaduti</div><div class="stat-value ${sc>0?'sv-red':'sv-green'}">${sc}</div></div>
-    <div class="stat-card"><div class="stat-label">In Scadenza 30gg</div><div class="stat-value ${wa>0?'sv-orange':'sv-green'}">${wa}</div></div>
-    <div class="stat-card"><div class="stat-label">Dipendenti Attivi Tot.</div><div class="stat-value sv-blue">${db.aziende.reduce((s,c)=>s+((c.dipendenti||[]).filter(d=>d.attivo).length),0)}</div></div>
+  const kpi=(ico,bg,col,v,l)=>`<div class="kpi"><div class="kpi-ico" style="background:${bg};color:${col};">${ico}</div><div><div class="kpi-v" style="color:${col};">${v}</div><div class="kpi-l">${l}</div></div></div>`;
+  el.innerHTML=`<div class="page-head"><div><div class="page-title">Scadenze</div><div class="page-sub">Aziende con adempimenti scaduti o in scadenza nei prossimi 30 giorni</div></div></div>
+  <div class="kpis">
+    ${kpi('⛔','var(--red-soft)','var(--red)',nSc,'Scadenze già scadute')}
+    ${kpi('⏳','var(--yellow-soft)','#9a6a06',nIn,'In scadenza entro 30 giorni')}
+    ${kpi('🏢','#eef4e8','var(--green)',(db.aziende.length-groups.length)+' / '+db.aziende.length,'Aziende in regola')}
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-    <div style="font-size:14px;font-weight:700;color:var(--text);">Scadenze per azienda <span style="font-weight:500;color:var(--text3);font-size:12px;">— in ordine cronologico, clicca una scadenza per modificarla</span></div>
-    <div style="display:flex;align-items:center;gap:8px;"><label style="margin:0;">Mostra</label>
-      <select onchange="setHomeWindow(this.value)" style="width:auto;padding:6px 10px;">
-        ${opt('30','Scadute + prossimi 30 giorni')}${opt('60','Scadute + prossimi 60 giorni')}${opt('90','Scadute + prossimi 90 giorni')}${opt('180','Scadute + prossimi 6 mesi')}${opt('all','Tutte le scadenze')}
-      </select></div>
-  </div>
-  ${groups.length===0?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:24px;text-align:center;color:var(--green);font-weight:700;">✓ Nessuna scadenza nel periodo selezionato</div>`:gHtml}`;
+  ${groups.length===0?`<div class="all-ok"><div class="all-ok-i">✓</div><div style="font-size:17px;font-weight:800;">Tutto in regola</div><div style="font-size:13px;color:var(--text3);margin-top:6px;">Nessuna scadenza scaduta o in arrivo nei prossimi 30 giorni.</div></div>`:gHtml}`;
 }
 
 // MODALI
@@ -1240,15 +1375,24 @@ function mostraBanner(){ const b=document.getElementById('syncBanner'); if(b){ b
 
 // --- schermata di accesso ---
 function mostraAuth(modo,msg){
+  const r=document.getElementById('regScreen');
+  if(modo==='registra'){
+    document.getElementById('authScreen').style.display='none'; r.style.display='block';
+    document.getElementById('regContatti').innerHTML=contattiHTML().replace(/color:var\(--accent\)/g,'color:#fff');
+    try{ if(location.hash!=='#registrati') history.replaceState(null,'','#registrati'); }catch(e){}
+    regMsg(msg||''); return;
+  }
+  r.style.display='none';
+  try{ if(location.hash==='#registrati') history.replaceState(null,'',location.pathname); }catch(e){}
   const a=document.getElementById('authScreen'); a.style.display='flex';
   document.getElementById('authLogin').style.display=modo==='login'?'block':'none';
   document.getElementById('authNuovaPw').style.display=modo==='nuovapw'?'block':'none';
   document.getElementById('authConfig').style.display=modo==='config'?'block':'none';
-  document.getElementById('authRegistra').style.display=modo==='registra'?'block':'none';
   document.getElementById('authAttesa').style.display=modo==='attesa'?'block':'none';
   authMsg(msg||'');
 }
-function nascondiAuth(){ document.getElementById('authScreen').style.display='none'; }
+function nascondiAuth(){ document.getElementById('authScreen').style.display='none'; document.getElementById('regScreen').style.display='none'; }
+function regMsg(t,ok){ const e=document.getElementById('regMsg'); if(e){ e.textContent=t; e.style.color=ok?'var(--green)':'var(--red)'; } }
 function authMsg(t,ok){ const e=document.getElementById('authMsg'); e.textContent=t; e.style.color=ok?'var(--green)':'var(--red)'; }
 function erroreIT(e){
   const m=(e&&e.message)?e.message:String(e||'');
@@ -1292,14 +1436,18 @@ async function salvaNuovaPw(ev){
 }
 async function eseguiRegistrazione(ev){
   if(ev) ev.preventDefault();
-  const nome=v('regNome'), azienda=v('regAzienda'), telefono=v('regTel'), email=v('regEmail'), pw=document.getElementById('regPw').value;
-  if(!nome||!email||!pw){ authMsg('Compila nome, email e password.'); return; }
-  if(pw.length<6){ authMsg('La password deve avere almeno 6 caratteri.'); return; }
-  if(!document.getElementById('regPrivacy').checked){ authMsg('Devi accettare l\'informativa privacy.'); return; }
-  const btn=document.getElementById('regBtn'); btn.disabled=true; btn.textContent='Registrazione…';
-  const {data,error}=await sb.auth.signUp({email,password:pw,options:{data:{nome,azienda,telefono},emailRedirectTo:location.origin+location.pathname}});
+  const d={nome:v('regNome'),cognome:v('regCognome'),azienda:v('regAzienda'),piva:v('regPiva'),indirizzo:v('regIndirizzo'),
+    citta:v('regCitta'),cap:v('regCap'),provincia:v('regProv').toUpperCase(),telefono:v('regTel')};
+  const email=v('regEmail'), pw=document.getElementById('regPw').value, pw2=document.getElementById('regPw2').value;
+  if(!d.nome||!d.cognome||!d.azienda||!d.piva||!email||!pw){ regMsg('Compila tutti i campi obbligatori (*).'); return; }
+  if(!/^\S+@\S+\.\S+$/.test(email)){ regMsg('Indirizzo email non valido.'); return; }
+  if(pw.length<6){ regMsg('La password deve avere almeno 6 caratteri.'); return; }
+  if(pw!==pw2){ regMsg('Le due password non coincidono.'); return; }
+  if(!document.getElementById('regPrivacy').checked){ regMsg('Devi accettare l\'informativa privacy.'); return; }
+  const btn=document.getElementById('regBtn'); btn.disabled=true; btn.textContent='Registrazione in corso…';
+  const {data,error}=await sb.auth.signUp({email,password:pw,options:{data:d,emailRedirectTo:location.origin+location.pathname}});
   btn.disabled=false; btn.textContent='Crea account';
-  if(error){ authMsg(erroreIT(error)); return; }
+  if(error){ regMsg(erroreIT(error)); return; }
   if(!data.session){ mostraAuth('login'); authMsg('Registrazione completata. Controlla la tua email e clicca sul link di conferma, poi accedi.',true); }
 }
 function contattiHTML(){
@@ -1544,8 +1692,8 @@ function staModificando(){
   const a=document.activeElement; return !!(a&&(a.tagName==='TEXTAREA'||a.tagName==='INPUT'||a.tagName==='SELECT'));
 }
 function refreshUI(){
-  renderSidebar();
-  if(currentCompanyId&&getCompany()) renderTab();
+  if(currentPage==='dati'||currentPage==='clienti'){ renderSidebar(); return; }
+  if(currentCompanyId&&getCompany()){ renderSidebar(); renderTab(); }
   else goHome();
 }
 document.addEventListener('focusout',()=>{ if(SYNC.uiPending) setTimeout(()=>{ if(!staModificando()){ SYNC.uiPending=false; refreshUI(); } },300); });
@@ -1574,17 +1722,18 @@ async function backupGiornaliero(){
 // --- riquadro spazio / account nella barra laterale ---
 function renderSpazioBox(){
   const el=document.getElementById('spazioBox'); if(!el) return;
-  if(!SYNC.user){ el.innerHTML=''; return; }
+  const nav=document.getElementById('nav-clienti');
+  if(!SYNC.user){ el.innerHTML=''; if(nav) nav.style.display='none'; return; }
   const sp=SYNC.spazi.find(s=>s.id===SYNC.spazio);
-  const sel=SYNC.spazi.length>1
-    ?`<select class="spazio-sel" onchange="cambiaSpazio(this.value)">${SYNC.spazi.map(s=>`<option value="${s.id}" ${s.id===SYNC.spazio?'selected':''}>${escH(s.nome)}${(s.attivo||SYNC.me.admin)?'':' (non attivo)'}</option>`).join('')}</select>`
-    :`<div class="spazio-nome">${escH(sp?sp.nome:'')}</div>`;
   const me=SYNC.me||{};
-  const piano=me.admin?'👑 Amministratore':(sp&&sp.scadenza?`Attivo fino al ${fDate(sp.scadenza)}`:'');
-  el.innerHTML=`${sel}<div class="spazio-user" title="${escH(SYNC.user.email)}">👤 ${escH(SYNC.user.email)}</div>
-    ${piano?`<div class="spazio-user">${piano}</div>`:''}
-    <button class="btn-backup btn-export" style="flex:none;width:100%;" onclick="apriAccount()">⚙️ Account e colleghi</button>
-    ${me.admin?`<button class="btn-backup btn-import" style="flex:none;width:100%;" onclick="apriAdmin()">👑 Clienti e abbonamenti <span id="adminBadge"></span></button>`:''}`;
+  const sel=SYNC.spazi.length>1
+    ?`<select class="ah-spazio" onchange="cambiaSpazio(this.value)" title="Cambia gestionale">${SYNC.spazi.map(s=>`<option value="${s.id}" ${s.id===SYNC.spazio?'selected':''}>${escH(s.nome)}${(s.attivo||me.admin)?'':' (non attivo)'}</option>`).join('')}</select>`:'';
+  const piano=me.admin?'Amministratore':(sp&&sp.scadenza?`Attivo fino al ${fDate(sp.scadenza)}`:(sp?escH(sp.nome):''));
+  const ini=(String(me.nome||SYNC.user.email||'?').trim()[0]||'?').toUpperCase();
+  el.innerHTML=`${sel}<div class="ah-user" onclick="apriAccount()" title="Account, colleghi e avvisi">
+    <div class="ah-user-t"><span class="ah-user-e">${escH(SYNC.user.email)}</span><span class="ah-user-p">${piano}</span></div>
+    <div class="ah-avatar">${escH(ini)}</div></div>`;
+  if(nav) nav.style.display=me.admin?'flex':'none';
   if(me.admin) aggiornaBadge();
 }
 async function cambiaSpazio(sid){
@@ -1675,7 +1824,7 @@ async function caricaMembri(){
   if(error){ box.textContent='Errore: '+erroreIT(error); return; }
   const tit=SYNC.ruolo==='titolare';
   box.innerHTML=(data||[]).map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
-    <span>${escH(m.email)} ${m.ruolo==='titolare'?'<span class="chip" style="background:#e0e7ff;color:#3730a3;" style="margin-left:6px;">titolare</span>':''}</span>
+    <span>${escH(m.email)} ${m.ruolo==='titolare'?'<span class="chip" style="background:#f8e8da;color:#96440f;" style="margin-left:6px;">titolare</span>':''}</span>
     ${tit&&m.user_id!==SYNC.user.id?`<button class="btn btn-danger btn-sm" onclick="rimuoviCollega('${m.user_id}')">Rimuovi</button>`:''}</div>`).join('');
 }
 async function aggiungiCollega(){
@@ -1713,7 +1862,7 @@ function isoLocale(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStar
 function isoOggi(){ return isoLocale(new Date()); }
 function addMesi(ds,n){ const [y,m,g]=ds.split('-').map(Number); const d=new Date(y,m-1+n,1); const ultimo=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); d.setDate(Math.min(g,ultimo)); return isoLocale(d); }
 function statoUtente(u){
-  if(u.admin) return {k:'admin',t:'Amministratore',c:'#e0e7ff',f:'#3730a3'};
+  if(u.admin) return {k:'admin',t:'Amministratore',c:'#f8e8da',f:'#96440f'};
   if(!u.scadenza) return {k:'attesa',t:'In attesa',c:'#fef3c7',f:'#92400e'};
   const gg=daysUntil(u.scadenza);
   if(gg<0) return {k:'scaduto',t:'Scaduto',c:'#fee2e2',f:'#991b1b'};
@@ -1724,16 +1873,24 @@ async function aggiornaBadge(){
   const {data}=await sb.rpc('admin_lista_utenti'); if(!data) return;
   ADMIN.utenti=data;
   const n=data.filter(u=>statoUtente(u).k==='attesa').length;
-  const b=document.getElementById('adminBadge'); if(b) b.innerHTML=n?`<span style="background:#ef4444;color:#fff;border-radius:10px;padding:0 6px;margin-left:4px;font-size:10px;">${n}</span>`:'';
+  const b=document.getElementById('adminBadge'); if(b) b.innerHTML=n?`<span class="nav-badge" title="${n} in attesa di attivazione">${n}</span>`:'';
 }
 async function apriAdmin(){
-  document.getElementById('adminPanel').style.display='flex';
+  mostraPagina('clienti');
+  const lr=document.getElementById('linkReg'); if(lr) lr.textContent=linkRegistrazione();
   document.getElementById('adminLista').innerHTML='<div style="padding:24px;color:var(--text3);">Caricamento…</div>';
   const {data,error}=await sb.rpc('admin_lista_utenti');
   if(error){ document.getElementById('adminLista').innerHTML='<div style="padding:24px;color:var(--red);">'+escH(erroreIT(error))+'</div>'; return; }
   ADMIN.utenti=data||[]; renderAdmin();
 }
-function chiudiAdmin(){ document.getElementById('adminPanel').style.display='none'; aggiornaBadge(); }
+function chiudiAdmin(){ goHome(); }
+function linkRegistrazione(){ return (CFG.URL_APP||((location.origin+location.pathname).replace(/index\.html$/,'')))+'#registrati'; }
+async function copiaLinkReg(btn){
+  const t=linkRegistrazione();
+  try{ await navigator.clipboard.writeText(t); btn.textContent='✓ Copiato'; }catch(e){ prompt('Copia il link:',t); }
+  setTimeout(()=>{ btn.textContent='Copia link'; },2000);
+}
+function apriDati(){ mostraPagina('dati'); }
 function renderAdmin(){
   const conta={tutti:0,attesa:0,attivo:0,inscadenza:0,scaduto:0};
   ADMIN.utenti.forEach(u=>{ const k=statoUtente(u).k; conta.tutti++; if(conta[k]!==undefined) conta[k]++; });
@@ -1743,14 +1900,16 @@ function renderAdmin(){
   const lista=ADMIN.utenti.filter(u=>{
     const k=statoUtente(u).k;
     if(ADMIN.filtro!=='tutti'&&k!==ADMIN.filtro) return false;
-    return !q||[u.email,u.nome,u.azienda,u.telefono].some(x=>String(x||'').toLowerCase().includes(q));
+    return !q||[u.email,u.nome,u.cognome,u.azienda,u.telefono,u.piva,u.citta].some(x=>String(x||'').toLowerCase().includes(q));
   });
   document.getElementById('adminLista').innerHTML=lista.length===0?'<div style="padding:24px;color:var(--text3);">Nessun utente.</div>':
   `<table class="admin-tab"><thead><tr><th>Utente</th><th>Registrato</th><th>Stato</th><th>Piano</th><th>Scadenza</th><th>Note</th><th>Azioni</th></tr></thead><tbody>${lista.map(u=>{
     const st=statoUtente(u), id=u.user_id;
     return `<tr>
-      <td><div style="font-weight:700;">${escH(u.nome||'—')}</div><div style="font-size:12px;">${escH(u.email)}</div>
-        <div style="font-size:11px;color:var(--text3);">${escH(u.azienda||'')}${u.telefono?' · 📞 '+escH(u.telefono):''}</div>
+      <td><div style="font-weight:700;">${escH([u.nome,u.cognome].filter(Boolean).join(' ')||'—')}</div><div style="font-size:12px;">${escH(u.email)}</div>
+        ${u.azienda?`<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:3px;">🏢 ${escH(u.azienda)}${u.piva?` <span style="font-weight:500;color:var(--text3);">· P.IVA ${escH(u.piva)}</span>`:''}</div>`:''}
+        ${(u.indirizzo||u.citta)?`<div style="font-size:11px;color:var(--text3);">📍 ${escH([u.indirizzo,[u.cap,u.citta].filter(Boolean).join(' '),u.provincia?'('+u.provincia+')':''].filter(Boolean).join(', '))}</div>`:''}
+        ${u.telefono?`<div style="font-size:11px;color:var(--text3);">📞 ${escH(u.telefono)}</div>`:''}
         ${u.gestionali?`<div style="font-size:11px;color:var(--text3);">🗂 ${escH(u.gestionali)}</div>`:''}</td>
       <td style="font-size:12px;white-space:nowrap;">${fDate(String(u.registrato_il).slice(0,10))}${u.ultimo_accesso?`<div style="font-size:11px;color:var(--text3);">ultimo accesso ${fDate(String(u.ultimo_accesso).slice(0,10))}</div>`:''}</td>
       <td><span class="chip" style="background:${st.c};color:${st.f};">${st.t}</span></td>
@@ -1795,7 +1954,7 @@ async function syncInit(){
     if(evento==='PASSWORD_RECOVERY'){ SYNC.recupero=true; mostraAuth('nuovapw'); return; }
     if(SYNC.recupero) return;
     if(sessione&&sessione.user){ setTimeout(()=>avviaSessione(sessione.user),0); }
-    else if(evento==='SIGNED_OUT'||evento==='INITIAL_SESSION'){ resetSessione(); mostraAuth('login'); }
+    else if(evento==='SIGNED_OUT'||evento==='INITIAL_SESSION'){ resetSessione(); mostraAuth(evento==='INITIAL_SESSION'&&location.hash==='#registrati'?'registra':'login'); }
   });
 }
 
@@ -1812,7 +1971,7 @@ function esportaBackup() {
   a.click();
   URL.revokeObjectURL(url);
   // Mostra conferma
-  const btn = document.querySelector('.btn-export');
+  const btn = document.getElementById('btnEsporta');
   const orig = btn.innerHTML;
   btn.innerHTML = '✅ Salvato!';
   btn.style.background = 'rgba(61,220,132,0.25)';
@@ -1843,12 +2002,8 @@ function importaBackup(event) {
       saveDb();
       currentCompanyId = null;
       renderSidebar();
-      document.getElementById('companyView').style.display = 'none';
-      document.getElementById('emptyState').style.display = 'none';
-      if (db.aziende.length > 0) renderGlobalDash();
-      else document.getElementById('emptyState').style.display = 'flex';
       // Conferma visiva
-      const btn = document.querySelector('.btn-import');
+      const btn = document.getElementById('btnImporta');
       const orig = btn.innerHTML;
       btn.innerHTML = `✅ ${quante} aziende caricate!`;
       setTimeout(() => { btn.innerHTML = orig; }, 3000);
@@ -1862,7 +2017,7 @@ function importaBackup(event) {
 }
 
 // ELIMINA AZIENDA
-function deleteCompany(){const c=getCompany();if(!confirm(`Eliminare definitivamente "${c.nome}"?`+(SYNC.ready?"\n\nVerrà eliminata anche per i colleghi (resta nel backup giornaliero).":"")))return;db.aziende=db.aziende.filter(a=>a.id!==currentCompanyId);currentCompanyId=null;saveDb();renderSidebar();document.getElementById('companyView').style.display='none';document.getElementById('globalDashboard').style.display='none';if(db.aziende.length>0)renderGlobalDash();else document.getElementById('emptyState').style.display='flex';}
+function deleteCompany(){const c=getCompany();if(!confirm(`Eliminare definitivamente "${c.nome}"?`+(SYNC.ready?"\n\nVerrà eliminata anche per i colleghi (resta nel backup giornaliero).":"")))return;db.aziende=db.aziende.filter(a=>a.id!==currentCompanyId);currentCompanyId=null;saveDb();goHome();}
 
 // ===== EXPORT WORD =====
 async function scaricaWord() {
