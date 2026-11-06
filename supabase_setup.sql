@@ -629,6 +629,215 @@ do $$ begin
 end $$;
 
 -- =====================================================================
+-- INVIO AUTOMATICO ALLE AZIENDE (riepilogo scadenze 30 giorni prima)
+-- =====================================================================
+alter table public.spazi add column if not exists invio_aziende boolean not null default false;
+
+create table if not exists public.avvisi_aziende (
+  spazio_id  uuid not null references public.spazi(id) on delete cascade,
+  azienda_id text not null,
+  chiave     text not null,
+  inviato_il date not null default current_date,
+  primary key (spazio_id, azienda_id, chiave)
+);
+alter table public.avvisi_aziende enable row level security;
+revoke all on public.avvisi_aziende from anon, authenticated;
+
+create table if not exists public.invii_aziende (
+  id          bigserial primary key,
+  spazio_id   uuid not null references public.spazi(id) on delete cascade,
+  azienda_id  text not null,
+  destinatario text,
+  n_scadenze  integer,
+  richiesta   bigint,
+  inviato_il  timestamptz not null default now()
+);
+alter table public.invii_aziende enable row level security;
+revoke all on public.invii_aziende from anon, authenticated;
+
+-- intestazione senza controllo di accesso (uso interno)
+create or replace function public.st81_intestazione(s uuid)
+returns jsonb
+language plpgsql security definer stable set search_path = public as $$
+declare j jsonb; p record;
+begin
+  select intestazione into j from public.spazi where id = s;
+  if j is not null then return j || jsonb_build_object('salvata', true); end if;
+  select pr.* into p from public.membri m join public.profili pr on pr.user_id = m.user_id
+   where m.spazio_id = s and m.ruolo = 'titolare' limit 1;
+  return jsonb_build_object(
+    'nome',      coalesce(nullif(p.azienda, ''), trim(coalesce(p.nome, '') || ' ' || coalesce(p.cognome, ''))),
+    'referente', trim(coalesce(p.nome, '') || ' ' || coalesce(p.cognome, '')),
+    'email',     p.email,
+    'telefono',  p.telefono,
+    'whatsapp',  p.telefono,
+    'indirizzo', concat_ws(', ', nullif(p.indirizzo, ''), nullif(trim(concat_ws(' ', p.cap, p.citta, case when coalesce(p.provincia, '') <> '' then '(' || p.provincia || ')' end)), '')),
+    'piva',      p.piva,
+    'salvata',   false);
+end $$;
+
+create or replace function public.intestazione_spazio(s uuid)
+returns jsonb
+language plpgsql security definer stable set search_path = public as $$
+begin
+  if not public.is_membro(s) then raise exception 'Accesso negato'; end if;
+  return public.st81_intestazione(s);
+end $$;
+
+create or replace function public.st81_invia_email_az(destinatario text, cc text, rispondi_a text, nome_mittente text, oggetto text, html text)
+returns bigint
+language plpgsql security definer set search_path = public, extensions as $$
+declare k text; me text; rid bigint; body jsonb;
+begin
+  select valore into k  from public.impostazioni where chiave = 'brevo_api_key';
+  select valore into me from public.impostazioni where chiave = 'mittente_email';
+  if not public.st81_email_configurata() then return null; end if;
+  body := jsonb_build_object(
+    'sender', jsonb_build_object('name', left(coalesce(nullif(nome_mittente, ''), 'SafeTrack 81'), 70), 'email', me),
+    'to', jsonb_build_array(jsonb_build_object('email', destinatario)),
+    'subject', oggetto, 'htmlContent', html);
+  if coalesce(rispondi_a, '') ~ '^\S+@\S+\.\S+$' then
+    body := body || jsonb_build_object('replyTo', jsonb_build_object('email', rispondi_a, 'name', left(coalesce(nome_mittente, ''), 70)));
+    if lower(rispondi_a) <> lower(destinatario) and coalesce(cc, '') ~ '^\S+@\S+\.\S+$' then
+      body := body || jsonb_build_object('cc', jsonb_build_array(jsonb_build_object('email', cc)));
+    end if;
+  end if;
+  select net.http_post(
+    url := 'https://api.brevo.com/v3/smtp/email', body := body,
+    headers := jsonb_build_object('api-key', k, 'Content-Type', 'application/json', 'accept', 'application/json'),
+    timeout_milliseconds := 15000) into rid;
+  return rid;
+end $$;
+
+create or replace function public.st81_rinnovo(anni text) returns text
+language sql immutable as $$
+  select case nullif(regexp_replace(coalesce(anni, ''), '\D', '', 'g'), '')::int
+    when 1 then 'Aggiornamento Annuale' when 2 then 'Aggiornamento Biennale' when 3 then 'Aggiornamento Triennale'
+    when 4 then 'Aggiornamento Quadriennale' when 5 then 'Aggiornamento Quinquennale'
+    else case when nullif(regexp_replace(coalesce(anni, ''), '\D', '', 'g'), '') is null or nullif(regexp_replace(coalesce(anni, ''), '\D', '', 'g'), '')::int = 0 then null
+              else 'Aggiornamento ogni ' || regexp_replace(anni, '\D', '', 'g') || ' anni' end end;
+$$;
+
+-- invio giornaliero: un'email per azienda quando una scadenza entra nei 30 giorni (o è scaduta e non ancora segnalata)
+create or replace function public.invia_avvisi_aziende() returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  sp record; az record; r record; it jsonb; tot integer := 0; n integer; nuovi integer;
+  righe text; html text; ogg text; mitt text; wa text; tel text; em text; contatto text; canale text; firma text; rid bigint; p text := '<p style="margin:0 0 4px 0;">';
+begin
+  if not public.st81_email_configurata() then return 0; end if;
+  for sp in
+    select s.id from public.spazi s
+    where s.invio_aziende
+      and exists (select 1 from public.membri m join public.profili pr on pr.user_id = m.user_id
+                  where m.spazio_id = s.id and m.ruolo = 'titolare'
+                    and (pr.admin or (pr.scadenza is not null and pr.scadenza >= current_date)))
+  loop
+    it := public.st81_intestazione(sp.id);
+    mitt := coalesce(nullif(it->>'nome', ''), 'Il tuo consulente per la sicurezza');
+    wa := trim(coalesce(it->>'whatsapp', '')); tel := trim(coalesce(it->>'telefono', '')); em := trim(coalesce(it->>'email', ''));
+    contatto := case when wa <> '' then ' oppure contattarci su WhatsApp al <strong>' || st81_html(wa) || '</strong>'
+                     when tel <> '' then ' oppure telefonarci al <strong>' || st81_html(tel) || '</strong>' else '' end;
+    canale := case when wa <> '' then 'sempre via email o WhatsApp' when tel <> '' then 'sempre via email o telefono' else 'sempre via email' end;
+    firma := p || 'Cordiali saluti</p>' || p || '<strong>' || st81_html(mitt) || '</strong></p>'
+      || case when coalesce(it->>'referente', '') not in ('', mitt) then p || st81_html(it->>'referente') || '</p>' else '' end
+      || case when em <> '' then p || 'Email: ' || st81_html(em) || '</p>' else '' end
+      || case when tel <> '' then p || 'Tel: ' || st81_html(tel) || '</p>' else '' end
+      || case when wa <> '' and wa <> tel then p || 'WhatsApp: ' || st81_html(wa) || '</p>' else '' end
+      || case when coalesce(it->>'indirizzo', '') <> '' then p || st81_html(it->>'indirizzo') || '</p>' else '' end
+      || case when coalesce(it->>'piva', '') <> '' then p || 'P.IVA ' || st81_html(it->>'piva') || '</p>' else '' end;
+
+    for az in
+      select a.id, a.dati->>'nome' as nome, trim(a.dati->>'email') as email, a.scadenze
+      from public.aziende a
+      where a.spazio_id = sp.id
+        and coalesce(a.dati->>'email', '') ~ '^\s*\S+@\S+\.\S+\s*$'
+        and coalesce(a.dati->>'avvisoAutoEmail', 'true') <> 'false'
+        and jsonb_typeof(a.scadenze) = 'array'
+    loop
+      righe := ''; n := 0; nuovi := 0;
+      for r in
+        select e->>'l' as voce, e->>'p' as persona, e->>'a' as anni, public.st81_data(e->>'d') as data,
+               az.id || '|' || coalesce(e->>'l', '') || '|' || coalesce(e->>'p', '') || '|' || coalesce(e->>'d', '') as chiave
+        from jsonb_array_elements(az.scadenze) e
+        where public.st81_data(e->>'d') is not null and public.st81_data(e->>'d') - current_date <= 30
+        order by public.st81_data(e->>'d')
+      loop
+        n := n + 1;
+        righe := righe || '<div style="margin-bottom:18px;">' || p || '- <strong>' || st81_html(r.voce)
+          || case when coalesce(r.persona, '') <> '' then ' — ' || st81_html(r.persona) else '' end || '</strong></p>'
+          || p || '<strong>SCADENZA: ' || to_char(r.data, 'DD/MM/YYYY') || '</strong></p>'
+          || coalesce(p || '<strong>' || public.st81_rinnovo(r.anni) || '</strong></p>', '') || '</div>';
+        if r.data - current_date >= -30 and not exists (select 1 from public.avvisi_aziende v where v.spazio_id = sp.id and v.azienda_id = az.id and v.chiave = r.chiave) then
+          nuovi := nuovi + 1;
+          insert into public.avvisi_aziende (spazio_id, azienda_id, chiave) values (sp.id, az.id, r.chiave) on conflict do nothing;
+        end if;
+      end loop;
+      if nuovi > 0 then
+        ogg := 'Riepilogo Scadenze D.Lgs. 81/08 — ' || az.nome;
+        html := '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#2b2119;max-width:680px;">'
+          || '<p style="margin:0 0 16px 0;">Gentile <strong>' || st81_html(az.nome) || '</strong>,</p>'
+          || '<p style="margin:0 0 16px 0;">di seguito il riepilogo dei documenti in scadenza nel prossimo mese. Ti invitiamo a prendere visione e a contattarci per pianificare il rinnovo.</p>'
+          || '<p style="margin:0 0 10px 0;"><strong>Documenti in scadenza:</strong></p>' || righe
+          || '<p style="margin:0 0 10px 0;"><strong>Come procedere all''aggiornamento:</strong></p>'
+          || '<p style="margin:0 0 6px 0;"><strong>1. Rinnovo e aggiornamento scadenze</strong></p>'
+          || '<p style="margin:0 0 16px 0;">Per procedere al rinnovo di uno o più documenti in scadenza, è sufficiente rispondere direttamente a questa email' || contatto || '. Provvederemo a organizzare tutto il necessario nel più breve tempo possibile.</p>'
+          || '<p style="margin:0 0 6px 0;"><strong>2. Variazioni aziendali</strong></p>'
+          || '<p style="margin:0 0 16px 0;">In caso di cambiamenti in azienda — quali nuove assunzioni, cambi di mansione, modifiche organizzative o acquisto di nuovi macchinari/attrezzature — Vi chiediamo di aggiornarci tempestivamente, ' || canale || '. Queste informazioni sono essenziali per mantenere la documentazione conforme al D.lgs. 81/08 e garantire la tutela di tutti i lavoratori.</p>'
+          || firma || '</div>';
+        rid := public.st81_invia_email_az(az.email, em, em, mitt, ogg, html);
+        insert into public.invii_aziende (spazio_id, azienda_id, destinatario, n_scadenze, richiesta) values (sp.id, az.id, az.email, n, rid);
+        tot := tot + 1;
+      end if;
+    end loop;
+  end loop;
+  delete from public.avvisi_aziende where inviato_il < current_date - 800;
+  return tot;
+end $$;
+
+-- funzioni per l'app
+create or replace function public.imposta_invio_aziende(s uuid, attivo boolean)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_titolare(s) then raise exception 'Solo il titolare può cambiare questa impostazione'; end if;
+  update public.spazi set invio_aziende = attivo where id = s;
+end $$;
+
+create or replace function public.stato_invio_aziende(s uuid)
+returns table (attivo boolean, email_ok boolean)
+language plpgsql security definer stable set search_path = public as $$
+begin
+  if not public.is_membro(s) then raise exception 'Accesso negato'; end if;
+  return query select sp.invio_aziende, public.st81_email_configurata() from public.spazi sp where sp.id = s;
+end $$;
+
+create or replace function public.ultimi_invii_aziende(s uuid)
+returns table (azienda_id text, inviato_il timestamptz, destinatario text, n_scadenze integer)
+language plpgsql security definer stable set search_path = public as $$
+begin
+  if not public.is_membro(s) then raise exception 'Accesso negato'; end if;
+  return query select distinct on (i.azienda_id) i.azienda_id, i.inviato_il, i.destinatario, i.n_scadenze
+    from public.invii_aziende i where i.spazio_id = s order by i.azienda_id, i.inviato_il desc;
+end $$;
+
+revoke all on function public.st81_intestazione(uuid) from public, anon, authenticated;
+revoke all on function public.st81_invia_email_az(text, text, text, text, text, text) from public, anon, authenticated;
+revoke all on function public.invia_avvisi_aziende() from public, anon, authenticated;
+revoke all on function public.imposta_invio_aziende(uuid, boolean) from public, anon;
+revoke all on function public.stato_invio_aziende(uuid) from public, anon;
+revoke all on function public.ultimi_invii_aziende(uuid) from public, anon;
+grant execute on function public.imposta_invio_aziende(uuid, boolean) to authenticated;
+grant execute on function public.stato_invio_aziende(uuid) to authenticated;
+grant execute on function public.ultimi_invii_aziende(uuid) to authenticated;
+
+-- ogni giorno alle 6:05 UTC (7:05 ora solare)
+do $$ begin
+  if exists (select 1 from cron.job where jobname = 'st81-avvisi-aziende') then perform cron.unschedule('st81-avvisi-aziende'); end if;
+  perform cron.schedule('st81-avvisi-aziende', '5 6 * * *', 'select public.invia_avvisi_aziende()');
+end $$;
+
+-- =====================================================================
 -- ULTIMO PASSO: dopo esserti registrato dall'app, rendi amministratore il tuo account.
 -- Sostituisci l'email e riesegui SOLO questa riga:
 -- update public.profili set admin = true where email = 'la-tua-email@esempio.it';

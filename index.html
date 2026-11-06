@@ -841,11 +841,23 @@ function renderNotifiche(c,el){
   const btnEmail = haEmail
     ? `<button onclick="inviaEmailScadenze()" style="background:#f8e8da;color:var(--accent);border:1px solid #efd3bb;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;">📧 Invia Email Scadenze a ${c.email}</button>`
     : `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;">⚠ Nessuna email inserita per questa azienda. <button onclick="openModal('editCompany')" style="background:none;border:none;color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">Aggiungila ora →</button></div>`;
+  const ia=SYNC.invioAz||{}, tit=SYNC.ruolo==='titolare', azOn=c.avvisoAutoEmail!==false, ult=(SYNC.ultimiInvii||{})[c.id];
+  let autoStato;
+  if(!haEmail) autoStato=`<span style="color:var(--text3);">Serve l'email dell'azienda per attivarlo.</span>`;
+  else if(!ia.attivo) autoStato=`<span style="color:#9a6a06;">L'invio automatico è disattivato per questo gestionale.</span> ${tit?`<a href="#" onclick="apriAccount();return false;" style="color:var(--accent);font-weight:700;">Attivalo in ⚙️ Account</a>`:'Può attivarlo il titolare.'}`;
+  else if(!azOn) autoStato=`<span style="color:var(--text3);">Escluso per questa azienda: l'email va inviata a mano.</span>`;
+  else autoStato=`<span style="color:var(--green);font-weight:600;">✓ Attivo</span> — quando una scadenza entra nei 30 giorni, <strong>${escH(c.email)}</strong> riceve in automatico il riepilogo (al mattino).`;
+  const boxAuto=`<div class="card" style="padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:260px;"><div style="font-size:13px;font-weight:700;margin-bottom:3px;">🤖 Invio automatico all'azienda, 30 giorni prima</div>
+        <div style="font-size:12.5px;color:var(--text2);line-height:1.5;">${autoStato}${ult?`<div style="font-size:11.5px;color:var(--text3);margin-top:3px;">Ultimo invio automatico: ${fDate(String(ult.inviato_il).slice(0,10))} a ${escH(ult.destinatario||'')} (${ult.n_scadenze} scadenz${ult.n_scadenze===1?'a':'e'})</div>`:''}</div></div>
+      ${haEmail?`<label style="display:flex;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:normal;font-size:12px;color:var(--text2);cursor:pointer;"><span class="switch"><input type="checkbox" ${azOn?'checked':''} onchange="toggleAvvisoAzienda(this.checked)"><span class="slider"></span></span>Per questa azienda</label>`:''}
+    </div>`;
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-      <div style="font-size:16px;font-weight:800;">${c.nome} — Scadenze</div>
+      <div style="font-size:16px;font-weight:800;">${escH(c.nome)} — Scadenze</div>
       ${btnEmail}
     </div>
+    ${boxAuto}
     ${all.length===0?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:24px;text-align:center;color:var(--green);font-weight:700;">✓ Tutto in regola — Nessuna scadenza nei prossimi 30 giorni</div>`:`
     <div class="gnil" style="margin-bottom:24px;">${all.map(a=>`
       <div class="gni ${a.stato==='sc'?'urgent':'warning'}" onclick="openModal('${a.modal}','${a.extra}')" style="cursor:pointer;" title="Clicca per modificare">
@@ -1561,6 +1573,7 @@ async function apriSpazio(sid){
   db.aziende.sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'it'));
   SYNC.attivo=true; SYNC.ready=true;
   await caricaIntestazione();
+  await caricaInvioAziende();
   migraDati();
   await flush();                       // salva eventuali dati aggiornati dalla migrazione
   allineaScadenze(scadSalvate);        // prepara l'elenco scadenze per gli avvisi email
@@ -1586,6 +1599,20 @@ async function caricaIntestazione(){
   const sub=document.querySelector('.ah-sub'); if(sub) sub.textContent=(SYNC.intest&&SYNC.intest.nome)||'Scadenze D.Lgs. 81/08';
 }
 function I(){ return SYNC.intest||{}; }
+async function caricaInvioAziende(){
+  SYNC.invioAz={attivo:false,email_ok:false}; SYNC.ultimiInvii={};
+  try{
+    const [a,b]=await Promise.all([sb.rpc('stato_invio_aziende',{s:SYNC.spazio}),sb.rpc('ultimi_invii_aziende',{s:SYNC.spazio})]);
+    if(a.data&&a.data[0]) SYNC.invioAz=a.data[0];
+    (b.data||[]).forEach(r=>{ SYNC.ultimiInvii[r.azienda_id]=r; });
+  }catch(e){ console.warn(e); }
+}
+function toggleAvvisoAzienda(on){ const c=getCompany(); if(!c) return; c.avvisoAutoEmail=on; saveDb(); renderTab(); }
+async function impostaInvioAziende(on){
+  const {error}=await sb.rpc('imposta_invio_aziende',{s:SYNC.spazio,attivo:on});
+  if(error){ alert(erroreIT(error)); return false; }
+  SYNC.invioAz.attivo=on; return true;
+}
 
 // --- tempo reale: modifiche dei colleghi ---
 function sottoscriviCambi(sid){
@@ -1674,7 +1701,7 @@ async function scriviModifiche(){
     delete SYNC.saved[id]; delete SYNC.ver[id];
   }
 }
-function calcScadenze(c){ try{ return getAllDeadlines(c).map(x=>({l:x.label,d:x.date,p:x.persona||null})); }catch(e){ return []; } }
+function calcScadenze(c){ try{ return getAllDeadlines(c).map(x=>({l:x.label,d:x.date,p:x.persona||null,a:x.anniValidita||null})); }catch(e){ return []; } }
 async function scriviAzienda(c,js){
   const dati=JSON.parse(js); const scadenze=calcScadenze(dati);
   if(SYNC.ver[c.id]===undefined){
@@ -1786,6 +1813,10 @@ async function apriAccount(){
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;">
     <input type="checkbox" id="acc_avvisi" style="width:auto;" ${(SYNC.me&&SYNC.me.avvisi_email!==false)?'checked':''} onchange="salvaAvvisi(this.checked)">
     Ricevi ogni mattina un'email con le scadenze a 30 giorni, a 7 giorni e scadute</label></div>
+  ${tit?`<div class="fg"><label>Invio automatico alle aziende</label>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;">
+    <input type="checkbox" id="acc_invioaz" style="width:auto;margin-top:3px;" ${(SYNC.invioAz&&SYNC.invioAz.attivo)?'checked':''} onchange="salvaInvioAziende(this.checked)">
+    <span>Quando una scadenza entra nei 30 giorni, invia in automatico all'azienda (alla sua email) il riepilogo delle scadenze, firmato con l'intestazione qui sotto. Le risposte arrivano all'email dell'intestazione. Si può escludere ogni singola azienda dalla sua scheda Scadenze.</span></label></div>`:''}
   <div class="fg"><label>Intestazione per email e documenti</label>
     <div style="font-size:12px;color:var(--text3);margin:-2px 0 10px;">Questi dati compaiono come firma nelle email di riepilogo alle aziende, come indirizzo in copia (CC) e nei documenti Word.${tit?'':' Può modificarli solo il titolare.'}</div>
     <div class="fr"><div><label>Studio / Azienda</label><input type="text" id="in_nome" ${tit?'':'disabled'}></div><div><label>Referente</label><input type="text" id="in_ref" ${tit?'':'disabled'}></div></div>
@@ -1881,6 +1912,13 @@ async function salvaIntestazione(){
   const {error}=await sb.rpc('salva_intestazione',{s:SYNC.spazio,dati:d});
   if(error){ accMsg(erroreIT(error)); return; }
   await caricaIntestazione(); accMsg('Intestazione salvata.',true);
+}
+async function salvaInvioAziende(on){
+  if(on&&!confirm('Attivare l\'invio automatico?\n\nDa domattina le aziende con email e scadenze entro 30 giorni (o già scadute) riceveranno il riepilogo, firmato con l\'intestazione del gestionale. Ogni scadenza viene comunicata una sola volta.')){ document.getElementById('acc_invioaz').checked=false; return; }
+  const ok=await impostaInvioAziende(on);
+  if(!ok){ document.getElementById('acc_invioaz').checked=!on; return; }
+  accMsg(on?'Invio automatico alle aziende attivato.':'Invio automatico alle aziende disattivato.',true);
+  if(currentCompanyId&&getCompany()) renderTab();
 }
 async function salvaAvvisi(on){
   const {error}=await sb.rpc('imposta_avvisi',{attivi:on});
