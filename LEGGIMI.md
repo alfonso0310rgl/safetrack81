@@ -66,6 +66,34 @@ Come funziona:
 - Collega GitHub nelle impostazioni di Claude e indica il nome del repository: le modifiche vengono pubblicate direttamente e il sito si aggiorna da solo in circa un minuto.
 - In alternativa: carica di nuovo `index.html` su GitHub con **Add file → Upload files**.
 
+## 8. Avvisi email delle scadenze
+Ogni mattina verso le 7 il gestionale controlla tutte le scadenze: DVR, nomine, attestati, formazione, idoneità mediche e altri documenti. Poi manda un'email riepilogativa a chi lavora su quel gestionale.
+- Ogni scadenza viene segnalata **3 volte**: a 30 giorni, a 7 giorni e quando scade.
+- Se non ci sono novità, l'email non parte.
+- Ogni utente può disattivare le email da **⚙️ Account e colleghi**.
+- I clienti con abbonamento scaduto non ricevono avvisi.
+
+**Configurazione (una volta sola):**
+1. Registrati gratis su https://www.brevo.com (300 email al giorno).
+2. In Brevo, **Senders, Domains & Dedicated IPs → Senders → Add a sender**: inserisci l'email da cui partiranno gli avvisi e confermala con il codice che ti arriva. Un'email del dominio dello studio arriva meglio di una Gmail.
+3. In Brevo, **SMTP & API → API Keys → Generate a new API key**: copia la chiave, che inizia con `xkeysib-`. Non condividerla con nessuno.
+4. In Supabase, **SQL Editor**, esegui queste righe con i tuoi dati:
+   ```sql
+   update public.impostazioni set valore = 'xkeysib-LA-TUA-CHIAVE' where chiave = 'brevo_api_key';
+   update public.impostazioni set valore = 'email-mittente-confermata@esempio.it' where chiave = 'mittente_email';
+   ```
+5. Prova l'invio con questa riga, poi controlla la posta, anche lo spam:
+   ```sql
+   select public.prova_email('tua@email.it');
+   ```
+   Se non arriva niente, esegui questa riga e mandami il risultato:
+   ```sql
+   select status_code, content::text from net._http_response order by created desc limit 3;
+   ```
+6. Per mandare subito gli avvisi senza aspettare domattina: `select public.invia_avvisi_scadenze();`
+   - Il numero restituito indica quante scadenze sono state segnalate.
+   - Le aziende già presenti vengono preparate per gli avvisi la prima volta che apri il gestionale con la nuova versione: apri il sito **prima** di lanciare questa riga.
+
 ## Da sapere
 - **Backup automatico**: ogni giorno viene salvata una copia nel database (tabella `backup`) e vengono tenuti gli ultimi 30 giorni. Puoi sempre fare anche **📥 Esporta**.
 - **Piano gratuito di Supabase**: il progetto va in pausa se nessuno lo usa per 7 giorni. Si riattiva dalla dashboard con **Restore**. Con l'uso quotidiano non succede.
