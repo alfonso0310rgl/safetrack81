@@ -285,8 +285,15 @@ insert into public.impostazioni (chiave, valore) values
   ('brevo_api_key',  'INSERISCI_CHIAVE_BREVO'),
   ('mittente_email', 'INSERISCI_EMAIL_MITTENTE'),
   ('mittente_nome',  'SafeTrack 81'),
-  ('url_app',        'https://alfonso0310rgl.github.io/safetrack81/')
+  ('url_app',        'https://alfonso0310rgl.github.io/safetrack81/'),
+  ('telegram_bot_token',    'INSERISCI_TOKEN_BOT'),
+  ('telegram_bot_username', 'INSERISCI_NOME_BOT')
 on conflict (chiave) do nothing;
+
+-- collegamento di una chat/gruppo Telegram a ciascun gestionale
+alter table public.spazi add column if not exists telegram_chat_id   text;
+alter table public.spazi add column if not exists telegram_codice    text;
+alter table public.spazi add column if not exists telegram_codice_il timestamptz;
 
 create table if not exists public.avvisi_inviati (
   spazio_id  uuid not null references public.spazi(id) on delete cascade,
@@ -310,6 +317,131 @@ begin
   return t::date;
 exception when others then return null;
 end $$;
+
+create or replace function public.st81_email_configurata() returns boolean
+language sql security definer stable set search_path = public as $$
+  select exists (select 1 from public.impostazioni where chiave = 'brevo_api_key' and valore not like 'INSERISCI%' and coalesce(valore,'') <> '')
+     and exists (select 1 from public.impostazioni where chiave = 'mittente_email' and valore not like 'INSERISCI%' and coalesce(valore,'') <> '');
+$$;
+
+create or replace function public.st81_invia_telegram(chat text, testo text) returns bigint
+language plpgsql security definer set search_path = public, extensions as $$
+declare tok text; rid bigint;
+begin
+  select valore into tok from public.impostazioni where chiave = 'telegram_bot_token';
+  if tok is null or tok like 'INSERISCI%' or chat is null then return null; end if;
+  select net.http_post(
+    url     := 'https://api.telegram.org/bot' || tok || '/sendMessage',
+    body    := jsonb_build_object('chat_id', chat, 'text', testo, 'parse_mode', 'HTML', 'disable_web_page_preview', true),
+    headers := jsonb_build_object('Content-Type', 'application/json'),
+    timeout_milliseconds := 15000
+  ) into rid;
+  return rid;
+end $$;
+
+-- legge i messaggi ricevuti dal bot per completare i collegamenti (/start CODICE); gira ogni minuto
+create or replace function public.st81_telegram_poll() returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  tok text; req bigint; req_il timestamptz; off bigint; resp text; js jsonb; u jsonb; txt text; m text[]; sid uuid; chat text;
+begin
+  select valore into tok from public.impostazioni where chiave = 'telegram_bot_token';
+  if tok is null or tok like 'INSERISCI%' then return; end if;
+  select nullif(valore, '')::bigint into req from public.impostazioni where chiave = 'tg_req_id';
+  select nullif(valore, '')::timestamptz into req_il from public.impostazioni where chiave = 'tg_req_il';
+  select coalesce(nullif(valore, '')::bigint, 0) into off from public.impostazioni where chiave = 'tg_offset';
+  if req is not null then
+    perform 1 from net._http_response where id = req;
+    if not found then
+      if req_il is not null and req_il > now() - interval '10 minutes' then return; end if;  -- risposta ancora in arrivo
+    else
+      select content into resp from net._http_response where id = req;
+      begin js := resp::jsonb; exception when others then js := null; end;
+      if js is not null and coalesce((js->>'ok')::boolean, false) then
+        for u in select * from jsonb_array_elements(js->'result') loop
+          off := greatest(off, (u->>'update_id')::bigint + 1);
+          txt  := coalesce(u->'message'->>'text', u->'channel_post'->>'text', '');
+          chat := coalesce(u->'message'->'chat'->>'id', u->'channel_post'->'chat'->>'id');
+          m := regexp_match(txt, '^/(start|collega)(@[A-Za-z0-9_]+)?\s+([A-Za-z0-9_-]+)');
+          if m is not null and chat is not null then
+            sid := null;
+            update public.spazi set telegram_chat_id = chat, telegram_codice = null
+              where telegram_codice = m[3] and telegram_codice_il > now() - interval '1 day'
+              returning id into sid;
+            if sid is not null then
+              perform public.st81_invia_telegram(chat, '✅ <b>SafeTrack 81</b> collegato al gestionale <b>' ||
+                public.st81_html((select nome from public.spazi where id = sid)) || '</b>.' || chr(10) ||
+                'Qui riceverai ogni mattina gli avvisi delle scadenze (a 30 giorni, a 7 giorni e alla scadenza).');
+            end if;
+          end if;
+        end loop;
+      end if;
+    end if;
+    req := null;
+  end if;
+  insert into public.impostazioni values ('tg_offset', off::text) on conflict (chiave) do update set valore = excluded.valore;
+  if exists (select 1 from public.spazi where telegram_codice is not null and telegram_codice_il > now() - interval '1 day') then
+    select net.http_get(url := 'https://api.telegram.org/bot' || tok || '/getUpdates?timeout=0&offset=' || off) into req;
+  end if;
+  insert into public.impostazioni values ('tg_req_id', coalesce(req::text, '')) on conflict (chiave) do update set valore = excluded.valore;
+  insert into public.impostazioni values ('tg_req_il', now()::text) on conflict (chiave) do update set valore = excluded.valore;
+end $$;
+
+-- funzioni per la schermata "Account e colleghi" (solo titolare)
+create or replace function public.telegram_stato(s uuid)
+returns table (collegato boolean, in_attesa boolean, bot text, configurato boolean)
+language plpgsql security definer stable set search_path = public as $$
+declare b text; t text;
+begin
+  if not public.is_membro(s) then raise exception 'Accesso negato'; end if;
+  select valore into b from public.impostazioni where chiave = 'telegram_bot_username';
+  select valore into t from public.impostazioni where chiave = 'telegram_bot_token';
+  return query select sp.telegram_chat_id is not null,
+                      sp.telegram_codice is not null and sp.telegram_codice_il > now() - interval '1 day',
+                      case when b like 'INSERISCI%' then null else ltrim(b, '@') end,
+                      (t is not null and t not like 'INSERISCI%' and b is not null and b not like 'INSERISCI%')
+               from public.spazi sp where sp.id = s;
+end $$;
+
+create or replace function public.telegram_genera_codice(s uuid)
+returns text
+language plpgsql security definer set search_path = public as $$
+declare c text;
+begin
+  if not public.is_titolare(s) then raise exception 'Solo il titolare può collegare Telegram'; end if;
+  if not public.spazio_attivo(s) then raise exception 'Abbonamento non attivo'; end if;
+  c := 'st' || substr(md5(random()::text || clock_timestamp()::text), 1, 12);
+  update public.spazi set telegram_codice = c, telegram_codice_il = now() where id = s;
+  return c;
+end $$;
+
+create or replace function public.telegram_scollega(s uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_titolare(s) then raise exception 'Solo il titolare può scollegare Telegram'; end if;
+  update public.spazi set telegram_chat_id = null, telegram_codice = null where id = s;
+end $$;
+
+create or replace function public.telegram_prova(s uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare c text;
+begin
+  if not public.is_titolare(s) then raise exception 'Solo il titolare'; end if;
+  select telegram_chat_id into c from public.spazi where id = s;
+  if c is null then raise exception 'Telegram non collegato'; end if;
+  perform public.st81_invia_telegram(c, '🛡️ <b>SafeTrack 81</b>' || chr(10) || '✅ Messaggio di prova: gli avvisi Telegram funzionano.');
+end $$;
+
+revoke all on function public.telegram_stato(uuid)         from public, anon;
+revoke all on function public.telegram_genera_codice(uuid) from public, anon;
+revoke all on function public.telegram_scollega(uuid)      from public, anon;
+revoke all on function public.telegram_prova(uuid)         from public, anon;
+grant execute on function public.telegram_stato(uuid)         to authenticated;
+grant execute on function public.telegram_genera_codice(uuid) to authenticated;
+grant execute on function public.telegram_scollega(uuid)      to authenticated;
+grant execute on function public.telegram_prova(uuid)         to authenticated;
 
 create or replace function public.st81_invia_email(destinatario text, oggetto text, html text) returns bigint
 language plpgsql security definer set search_path = public, extensions as $$
@@ -347,16 +479,17 @@ language plpgsql security definer set search_path = public as $$
 declare
   sp record; r record; dest record;
   righe text; n integer; tot integer := 0; url text; col text; etich text; html text; ogg text;
+  tg text; tg_extra integer; ico text; email_ok boolean := public.st81_email_configurata();
   td text := 'padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:13px;';
 begin
   select valore into url from public.impostazioni where chiave = 'url_app';
   for sp in
-    select s.id, s.nome from public.spazi s
+    select s.id, s.nome, s.telegram_chat_id from public.spazi s
     where exists (select 1 from public.membri m join public.profili p on p.user_id = m.user_id
                   where m.spazio_id = s.id and m.ruolo = 'titolare'
                     and (p.admin or (p.scadenza is not null and p.scadenza >= current_date)))
   loop
-    righe := ''; n := 0;
+    righe := ''; n := 0; tg := ''; tg_extra := 0;
     for r in
       with x as (
         select a.id as aid, a.dati->>'nome' as azienda, e->>'l' as voce, e->>'p' as persona,
@@ -382,6 +515,13 @@ begin
       righe := righe || format('<tr><td style="%s"><strong>%s</strong></td><td style="%s">%s</td><td style="%s">%s</td><td style="%s">%s</td><td style="%scolor:%s;font-weight:700;">%s</td></tr>',
         td, public.st81_html(r.azienda), td, public.st81_html(r.voce), td, public.st81_html(coalesce(r.persona, '—')),
         td, to_char(r.data, 'DD/MM/YYYY'), td, col, etich);
+      ico := case when r.giorni < 0 then '🔴' when r.giorni <= 7 then '🟠' else '🟡' end;
+      if length(tg) < 3300 then
+        tg := tg || ico || ' <b>' || public.st81_html(r.azienda) || '</b> — ' || public.st81_html(r.voce)
+              || case when coalesce(r.persona, '') = '' then '' else ' · ' || public.st81_html(r.persona) end || chr(10) || '      ' || to_char(r.data, 'DD/MM/YYYY') || ' · ' || etich || chr(10);
+      else
+        tg_extra := tg_extra + 1;
+      end if;
       insert into public.avvisi_inviati (spazio_id, chiave, soglia) values (sp.id, r.chiave, r.soglia) on conflict do nothing;
     end loop;
 
@@ -396,6 +536,13 @@ begin
         <p style="margin:18px 0 6px;"><a href="%s" style="background:#2f6ef5;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Apri il gestionale</a></p>
         <p style="font-size:11px;color:#6b7280;margin-top:16px;">Ogni scadenza viene segnalata a 30 giorni, a 7 giorni e quando scade. Puoi disattivare queste email da ⚙️ Account e colleghi.</p>
         </div></div>', public.st81_html(sp.nome), n, td, td, td, td, td, righe, coalesce(url, '#'));
+      if sp.telegram_chat_id is not null then
+        perform public.st81_invia_telegram(sp.telegram_chat_id,
+          '🛡️ <b>SafeTrack 81 — Scadenze</b>' || chr(10) || public.st81_html(sp.nome) || ': ' || n || case when n = 1 then ' nuova scadenza' else ' nuove scadenze' end || chr(10) || chr(10)
+          || tg || case when tg_extra > 0 then '…e altre ' || tg_extra || chr(10) else '' end
+          || chr(10) || '<a href="' || coalesce(url, '') || '">Apri il gestionale</a>');
+      end if;
+      if email_ok then
       for dest in
         select u.email from public.membri m
         join auth.users u on u.id = m.user_id
@@ -404,6 +551,7 @@ begin
       loop
         perform public.st81_invia_email(dest.email, ogg, html);
       end loop;
+      end if;
       tot := tot + n;
     end if;
   end loop;
@@ -414,6 +562,9 @@ end $$;
 revoke all on function public.st81_invia_email(text, text, text) from public, anon, authenticated;
 revoke all on function public.prova_email(text)                  from public, anon, authenticated;
 revoke all on function public.invia_avvisi_scadenze()            from public, anon, authenticated;
+revoke all on function public.st81_invia_telegram(text, text)    from public, anon, authenticated;
+revoke all on function public.st81_telegram_poll()               from public, anon, authenticated;
+revoke all on function public.st81_email_configurata()           from public, anon, authenticated;
 
 -- ogni giorno alle 6:00 UTC (7:00 ora solare, 8:00 ora legale)
 do $$ begin
@@ -421,6 +572,10 @@ do $$ begin
     perform cron.unschedule('st81-avvisi-scadenze');
   end if;
   perform cron.schedule('st81-avvisi-scadenze', '0 6 * * *', 'select public.invia_avvisi_scadenze()');
+  if exists (select 1 from cron.job where jobname = 'st81-telegram-collega') then
+    perform cron.unschedule('st81-telegram-collega');
+  end if;
+  perform cron.schedule('st81-telegram-collega', '* * * * *', 'select public.st81_telegram_poll()');
 end $$;
 
 -- =====================================================================

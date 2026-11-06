@@ -94,6 +94,27 @@ Ogni mattina verso le 7 il gestionale controlla tutte le scadenze: DVR, nomine, 
    - Il numero restituito indica quante scadenze sono state segnalate.
    - Le aziende già presenti vengono preparate per gli avvisi la prima volta che apri il gestionale con la nuova versione: apri il sito **prima** di lanciare questa riga.
 
+## 9. Avvisi su Telegram
+Gli avvisi delle scadenze possono arrivare anche su Telegram: in chat privata oppure in un gruppo, per esempio quello dell'ufficio. Ogni gestionale, tuo o di un cliente, collega la propria chat.
+
+**Configurazione del bot (una volta sola, la fa l'amministratore):**
+1. Su Telegram cerca **@BotFather** e invia `/newbot`.
+2. Scegli un nome, per esempio "SafeTrack 81 Avvisi", e uno username che finisca con `bot`, per esempio `SafeTrack81AvvisiBot`.
+3. BotFather ti dà un **token** del tipo `123456789:AA...`. È segreto: non condividerlo con nessuno.
+4. In Supabase, **SQL Editor**, esegui queste righe:
+   ```sql
+   update public.impostazioni set valore = 'IL-TOKEN-DEL-BOT' where chiave = 'telegram_bot_token';
+   update public.impostazioni set valore = 'NomeDelTuoBot' where chiave = 'telegram_bot_username';
+   ```
+
+**Collegare una chat (lo fa ogni titolare dal sito):**
+1. Apri **⚙️ Account e colleghi → Avvisi su Telegram → 📱 Collega Telegram**.
+2. Scegli dove ricevere gli avvisi:
+   - **👤 Chat privata**: si apre Telegram, premi **Avvia**;
+   - **👥 Aggiungi a un gruppo**: scegli il gruppo dell'ufficio.
+3. Entro un minuto arriva un messaggio di conferma e nel sito compare **✓ Collegato**.
+4. Da lì puoi inviare un messaggio di prova o scollegare la chat.
+
 ## Da sapere
 - **Backup automatico**: ogni giorno viene salvata una copia nel database (tabella `backup`) e vengono tenuti gli ultimi 30 giorni. Puoi sempre fare anche **📥 Esporta**.
 - **Piano gratuito di Supabase**: il progetto va in pausa se nessuno lo usa per 7 giorni. Si riattiva dalla dashboard con **Restore**. Con l'uso quotidiano non succede.

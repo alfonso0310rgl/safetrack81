@@ -924,7 +924,7 @@ function openModal(type,extra){
   else if(type==='altroCorso') el.innerHTML=mAltroCorso();
   else if(type==='altroCorsoGruppo') el.innerHTML=mAltroCorsoGruppo();
 }
-function closeModal(){document.getElementById('modalOverlay').style.display='none'; if(SYNC.uiPending&&!staModificando()){SYNC.uiPending=false;refreshUI();}}
+function closeModal(){if(typeof TG_TIMER!=='undefined'&&TG_TIMER){clearInterval(TG_TIMER);TG_TIMER=null;}document.getElementById('modalOverlay').style.display='none'; if(SYNC.uiPending&&!staModificando()){SYNC.uiPending=false;refreshUI();}}
 function closeModalOutside(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
 
 // HELPER: checklist dipendenti
@@ -1614,11 +1614,59 @@ async function apriAccount(){
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;">
     <input type="checkbox" id="acc_avvisi" style="width:auto;" ${(SYNC.me&&SYNC.me.avvisi_email!==false)?'checked':''} onchange="salvaAvvisi(this.checked)">
     Ricevi ogni mattina un'email con le scadenze a 30 giorni, a 7 giorni e scadute</label></div>
+  ${tit?`<div class="fg"><label>Avvisi su Telegram</label><div id="acc_tg" style="font-size:13px;color:var(--text2);">Caricamento…</div></div>`:''}
   <div class="fg"><label>Cambia la tua password</label>
     <div style="display:flex;gap:8px;"><input id="acc_pw" type="password" placeholder="Nuova password (min. 6 caratteri)" style="flex:1;"><button class="btn btn-secondary" onclick="cambiaPassword()">Aggiorna</button></div></div>
   <div id="acc_msg" style="font-size:12px;min-height:16px;margin-bottom:8px;"></div>
   <div class="fa"><button class="btn btn-danger" onclick="esci()">⎋ Esci</button><button class="btn btn-secondary" onclick="closeModal()">Chiudi</button></div>`;
   caricaMembri();
+  if(tit) caricaTelegram();
+}
+let TG_TIMER=null;
+async function caricaTelegram(){
+  const box=document.getElementById('acc_tg'); if(!box) return;
+  const {data,error}=await sb.rpc('telegram_stato',{s:SYNC.spazio});
+  if(error){ box.textContent='Non disponibile: '+erroreIT(error); return; }
+  const st=(data&&data[0])||{};
+  if(!st.configurato){ box.innerHTML='Il bot Telegram non è ancora configurato dall\'amministratore.'; return; }
+  if(st.collegato){
+    clearInterval(TG_TIMER); TG_TIMER=null;
+    box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="chip" style="background:#dcfce7;color:#166534;">✓ Collegato</span>
+      <span>Gli avvisi arrivano ogni mattina sulla chat collegata.</span></div>
+      <div style="display:flex;gap:8px;margin-top:8px;"><button class="btn btn-secondary btn-sm" onclick="provaTelegram()">Invia messaggio di prova</button><button class="btn btn-danger btn-sm" onclick="scollegaTelegram()">Scollega</button></div>`;
+    return;
+  }
+  box.innerHTML=`<div>Ricevi gli avvisi delle scadenze sul telefono, in chat privata o in un gruppo (es. il gruppo dell'ufficio).</div>
+    <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="collegaTelegram()">📱 Collega Telegram</button>`;
+}
+async function collegaTelegram(){
+  const box=document.getElementById('acc_tg');
+  const st=await sb.rpc('telegram_stato',{s:SYNC.spazio}); const bot=st.data&&st.data[0]&&st.data[0].bot;
+  const {data:codice,error}=await sb.rpc('telegram_genera_codice',{s:SYNC.spazio});
+  if(error||!bot){ accMsg(error?erroreIT(error):'Bot non configurato.'); return; }
+  const priv=`https://t.me/${encodeURIComponent(bot)}?start=${codice}`, grp=`https://t.me/${encodeURIComponent(bot)}?startgroup=${codice}`;
+  box.innerHTML=`<div style="margin-bottom:8px;">Scegli dove ricevere gli avvisi:</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;"><a class="btn btn-primary btn-sm" href="${priv}" target="_blank" rel="noopener" style="text-decoration:none;">👤 Chat privata</a>
+    <a class="btn btn-secondary btn-sm" href="${grp}" target="_blank" rel="noopener" style="text-decoration:none;">👥 Aggiungi a un gruppo</a></div>
+    <div style="font-size:12px;color:var(--text3);margin-top:8px;line-height:1.5;">Si apre Telegram: premi <strong>Avvia</strong> (o scegli il gruppo). Entro un minuto arriva un messaggio di conferma e qui comparirà "Collegato".<br>
+    Se il link non si apre, scrivi al bot <strong>@${escH(bot)}</strong> il messaggio: <code style="user-select:all;">/start ${escH(codice)}</code></div>`;
+  clearInterval(TG_TIMER); let giri=0;
+  TG_TIMER=setInterval(async()=>{
+    giri++; if(giri>60||!document.getElementById('acc_tg')){ clearInterval(TG_TIMER); TG_TIMER=null; return; }
+    const r=await sb.rpc('telegram_stato',{s:SYNC.spazio});
+    if(r.data&&r.data[0]&&r.data[0].collegato){ caricaTelegram(); accMsg('Telegram collegato.',true); }
+  },5000);
+}
+async function scollegaTelegram(){
+  if(!confirm('Scollegare Telegram? Non riceverai più gli avvisi su quella chat.')) return;
+  const {error}=await sb.rpc('telegram_scollega',{s:SYNC.spazio});
+  if(error){ accMsg(erroreIT(error)); return; }
+  accMsg('Telegram scollegato.',true); caricaTelegram();
+}
+async function provaTelegram(){
+  const {error}=await sb.rpc('telegram_prova',{s:SYNC.spazio});
+  if(error){ accMsg(erroreIT(error)); return; }
+  accMsg('Messaggio di prova inviato: controlla Telegram.',true);
 }
 function accMsg(t,ok){ const e=document.getElementById('acc_msg'); if(e){ e.textContent=t; e.style.color=ok?'var(--green)':'var(--red)'; } }
 async function caricaMembri(){
