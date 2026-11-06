@@ -1391,18 +1391,29 @@ async function apriSpazio(sid){
   SYNC.ready=false; setStato('sync');
   const sp=SYNC.spazi.find(s=>s.id===sid); SYNC.spazio=sid; SYNC.ruolo=sp?sp.ruolo:'membro';
   lsSet('st81_spazio_'+SYNC.user.id,sid);
-  const {data,error}=await sb.from('aziende').select('id,dati,versione').eq('spazio_id',sid);
+  const {data,error}=await sb.from('aziende').select('id,dati,versione,scadenze').eq('spazio_id',sid);
   if(error) throw error;
-  SYNC.ver={}; SYNC.saved={};
+  SYNC.ver={}; SYNC.saved={}; const scadSalvate={};
+  (data||[]).forEach(r=>{ scadSalvate[r.id]=JSON.stringify(r.scadenze||null); });
   db={aziende:(data||[]).map(r=>{ SYNC.ver[r.id]=r.versione; SYNC.saved[r.id]=JSON.stringify(r.dati); return r.dati; })};
   db.aziende.sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'it'));
   SYNC.attivo=true; SYNC.ready=true;
   migraDati();
   await flush();                       // salva eventuali dati aggiornati dalla migrazione
+  allineaScadenze(scadSalvate);        // prepara l'elenco scadenze per gli avvisi email
   sottoscriviCambi(sid);
   try{ await backupGiornaliero(); }catch(e){ console.warn('Backup giornaliero non riuscito',e); }
   SYNC.lastOk=new Date(); setStato('ok');
   currentCompanyId=null; renderSpazioBox(); bannerScadenza(); refreshUI();
+}
+
+async function allineaScadenze(salvate){
+  for(const c of db.aziende){
+    if(!SYNC.ready) return;
+    if(salvate[c.id]===undefined||SYNC.saved[c.id]!==JSON.stringify(c)) continue;
+    const sc=calcScadenze(c); if(salvate[c.id]===JSON.stringify(sc)) continue;
+    try{ await sb.from('aziende').update({scadenze:sc}).eq('spazio_id',SYNC.spazio).eq('id',c.id); }catch(e){ console.warn(e); }
+  }
 }
 
 // --- tempo reale: modifiche dei colleghi ---
@@ -1492,10 +1503,11 @@ async function scriviModifiche(){
     delete SYNC.saved[id]; delete SYNC.ver[id];
   }
 }
+function calcScadenze(c){ try{ return getAllDeadlines(c).map(x=>({l:x.label,d:x.date,p:x.persona||null})); }catch(e){ return []; } }
 async function scriviAzienda(c,js){
-  const dati=JSON.parse(js);
+  const dati=JSON.parse(js); const scadenze=calcScadenze(dati);
   if(SYNC.ver[c.id]===undefined){
-    const {error}=await sb.from('aziende').insert({spazio_id:SYNC.spazio,id:c.id,dati,versione:1});
+    const {error}=await sb.from('aziende').insert({spazio_id:SYNC.spazio,id:c.id,dati,scadenze,versione:1});
     if(error){
       if(error.code==='23505'){ SYNC.ver[c.id]=0; return scriviAzienda(c,js); } // esiste già: gestisci come conflitto
       if(error.code==='42501'&&!(await verificaAttivo())) return;
@@ -1504,7 +1516,7 @@ async function scriviAzienda(c,js){
     SYNC.ver[c.id]=1; SYNC.saved[c.id]=js; return;
   }
   const v=SYNC.ver[c.id];
-  const {data,error}=await sb.from('aziende').update({dati,versione:v+1})
+  const {data,error}=await sb.from('aziende').update({dati,scadenze,versione:v+1})
     .eq('spazio_id',SYNC.spazio).eq('id',c.id).eq('versione',v).select('versione');
   if(error) throw error;
   if(data&&data.length){ SYNC.ver[c.id]=data[0].versione; SYNC.saved[c.id]=js; return; }
@@ -1598,6 +1610,10 @@ async function apriAccount(){
   ${tit?`<div class="fg"><label>Aggiungi un collega (deve avere già un account)</label>
     <div style="display:flex;gap:8px;"><input id="acc_email" type="email" placeholder="email@studio.it" style="flex:1;"><button class="btn btn-primary" onclick="aggiungiCollega()">+ Aggiungi</button></div>
     <div style="font-size:11px;color:var(--text3);margin-top:4px;">Il collega vedrà e modificherà le stesse aziende in tempo reale.</div></div>`:''}
+  <div class="fg"><label>Avvisi email</label>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;">
+    <input type="checkbox" id="acc_avvisi" style="width:auto;" ${(SYNC.me&&SYNC.me.avvisi_email!==false)?'checked':''} onchange="salvaAvvisi(this.checked)">
+    Ricevi ogni mattina un'email con le scadenze a 30 giorni, a 7 giorni e scadute</label></div>
   <div class="fg"><label>Cambia la tua password</label>
     <div style="display:flex;gap:8px;"><input id="acc_pw" type="password" placeholder="Nuova password (min. 6 caratteri)" style="flex:1;"><button class="btn btn-secondary" onclick="cambiaPassword()">Aggiorna</button></div></div>
   <div id="acc_msg" style="font-size:12px;min-height:16px;margin-bottom:8px;"></div>
@@ -1630,6 +1646,11 @@ async function rinominaSpazio(){
   const n=v('acc_nome'); const {error}=await sb.rpc('rinomina_spazio',{s:SYNC.spazio,nuovo_nome:n});
   if(error){ accMsg(erroreIT(error)); return; }
   await aggiornaSpazi(); accMsg('Nome salvato.',true);
+}
+async function salvaAvvisi(on){
+  const {error}=await sb.rpc('imposta_avvisi',{attivi:on});
+  if(error){ accMsg(erroreIT(error)); document.getElementById('acc_avvisi').checked=!on; return; }
+  if(SYNC.me) SYNC.me.avvisi_email=on; accMsg(on?'Avvisi email attivati.':'Avvisi email disattivati.',true);
 }
 async function cambiaPassword(){
   const p=document.getElementById('acc_pw').value; if(p.length<6){ accMsg('La password deve avere almeno 6 caratteri.'); return; }
