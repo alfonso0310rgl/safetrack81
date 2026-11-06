@@ -53,6 +53,10 @@ Come funziona:
    - un file `backup_AAAA-MM-GG.json` della cartella `SafeTrack81_Dati/backup`.
 
 ## 6. Gestire clienti e abbonamenti
+- **Ogni gestionale ha la sua intestazione**: nome dello studio o dell'azienda, referente, email, telefono, WhatsApp, indirizzo e P.IVA.
+  - Viene compilata in automatico con i dati inseriti dal cliente alla registrazione.
+  - Il titolare la può modificare da **⚙️ Account → Intestazione per email e documenti**.
+  - Viene usata come firma nelle email di riepilogo alle aziende, come indirizzo in copia (CC), nel piè di pagina dei documenti Word e in alto nell'app.
 - **Link da mandare ai nuovi clienti**: `https://alfonso0310rgl.github.io/safetrack81/#registrati`. Apre direttamente la pagina di registrazione, dove il cliente inserisce i dati del referente e dell'azienda (P.IVA e indirizzo compresi) e l'email su cui riceverà gli avvisi. Lo trovi anche, con il pulsante **Copia link**, nella sezione **👥 Clienti e abbonati**.
 - La sezione **👥 Clienti e abbonati** (in alto) elenca tutti gli iscritti con nome, azienda, telefono e data di registrazione. Il numero rosso indica quanti sono in attesa.
 - **+1 mese / +1 anno**: attiva o rinnova. Se l'abbonamento è ancora valido, il periodo si aggiunge alla scadenza attuale, così il cliente non perde giorni.

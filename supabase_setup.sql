@@ -196,16 +196,17 @@ begin
   update public.profili set piano = nuovo_piano, scadenza = nuova_scadenza, note = nuove_note where user_id = u;
 end $$;
 
--- crea il gestionale vuoto al primo accesso (solo se l'utente non appartiene a nessuno spazio)
+-- il gestionale creato alla registrazione prende il nome dell'azienda del cliente
 create or replace function public.crea_spazio_personale()
 returns uuid
 language plpgsql security definer set search_path = public as $$
-declare sid uuid;
+declare sid uuid; nm text;
 begin
   if auth.uid() is null then raise exception 'Non autenticato'; end if;
   select spazio_id into sid from public.membri where user_id = auth.uid() limit 1;
   if sid is not null then return sid; end if;
-  insert into public.spazi (nome, creato_da) values ('Il mio gestionale', auth.uid()) returning id into sid;
+  select coalesce(nullif(trim(azienda), ''), 'Il mio gestionale') into nm from public.profili where user_id = auth.uid();
+  insert into public.spazi (nome, creato_da) values (coalesce(nm, 'Il mio gestionale'), auth.uid()) returning id into sid;
   insert into public.membri (spazio_id, user_id, ruolo) values (sid, auth.uid(), 'titolare');
   return sid;
 end $$;
@@ -272,6 +273,46 @@ grant execute on function public.membri_spazio(uuid)          to authenticated;
 grant execute on function public.aggiungi_membro(uuid, text)  to authenticated;
 grant execute on function public.rimuovi_membro(uuid, uuid)   to authenticated;
 grant execute on function public.rinomina_spazio(uuid, text)  to authenticated;
+
+-- ---------- INTESTAZIONE DI OGNI GESTIONALE (firma email, CC, documenti) ----------
+alter table public.spazi add column if not exists intestazione jsonb;
+
+-- intestazione salvata, oppure (se mai compilata) costruita dai dati di registrazione del titolare
+create or replace function public.intestazione_spazio(s uuid)
+returns jsonb
+language plpgsql security definer stable set search_path = public as $$
+declare j jsonb; p record;
+begin
+  if not public.is_membro(s) then raise exception 'Accesso negato'; end if;
+  select intestazione into j from public.spazi where id = s;
+  if j is not null then return j || jsonb_build_object('salvata', true); end if;
+  select pr.* into p from public.membri m join public.profili pr on pr.user_id = m.user_id
+   where m.spazio_id = s and m.ruolo = 'titolare' limit 1;
+  return jsonb_build_object(
+    'nome',      coalesce(nullif(p.azienda, ''), trim(coalesce(p.nome, '') || ' ' || coalesce(p.cognome, ''))),
+    'referente', trim(coalesce(p.nome, '') || ' ' || coalesce(p.cognome, '')),
+    'email',     p.email,
+    'telefono',  p.telefono,
+    'whatsapp',  p.telefono,
+    'indirizzo', concat_ws(', ', nullif(p.indirizzo, ''), nullif(trim(concat_ws(' ', p.cap, p.citta, case when coalesce(p.provincia, '') <> '' then '(' || p.provincia || ')' end)), '')),
+    'piva',      p.piva,
+    'salvata',   false);
+end $$;
+
+create or replace function public.salva_intestazione(s uuid, dati jsonb)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_titolare(s) then raise exception 'Solo il titolare può modificare l''intestazione'; end if;
+  update public.spazi set intestazione = (dati - 'salvata') where id = s;
+end $$;
+
+revoke all on function public.intestazione_spazio(uuid)        from public, anon;
+revoke all on function public.salva_intestazione(uuid, jsonb)  from public, anon;
+grant execute on function public.intestazione_spazio(uuid)       to authenticated;
+grant execute on function public.salva_intestazione(uuid, jsonb) to authenticated;
+
+
 
 -- ---------- AGGIORNAMENTO IN TEMPO REALE ----------
 do $$ begin

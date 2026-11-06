@@ -906,6 +906,13 @@ function inviaEmailScadenze() {
   }).join('\n');
 
   const oggetto = `Riepilogo Scadenze D.Lgs. 81/08 — ${c.nome}`;
+  const it = I();
+  const mitt = it.nome || 'il tuo consulente per la sicurezza';
+  const wa = (it.whatsapp||'').trim(), tel = (it.telefono||'').trim(), em = (it.email||'').trim();
+  const contattoTxt = wa ? `oppure contattarci su WhatsApp al ${wa}` : (tel ? `oppure telefonarci al ${tel}` : '');
+  const canaleTxt = wa ? 'sempre via email o WhatsApp' : (tel ? 'sempre via email o telefono' : 'sempre via email');
+  const firmaRighe = [it.referente&&it.referente!==it.nome?it.referente:'', em?`Email: ${em}`:'', tel?`Tel: ${tel}`:'', wa&&wa!==tel?`WhatsApp: ${wa}`:(wa&&wa===tel?'(anche WhatsApp)':''), it.indirizzo||'', it.piva?`P.IVA ${it.piva}`:''].filter(Boolean);
+  window._emailCC = em;
 
   const testoCompleto =
 `Gentile ${c.nome},
@@ -918,14 +925,14 @@ ${righeTesto}
 Come procedere all\'aggiornamento:
 
 1. Rinnovo e aggiornamento scadenze
-Per procedere al rinnovo di uno o più documenti in scadenza, è sufficiente rispondere direttamente a questa email oppure contattarci su WhatsApp al 0812597443. Provvederemo a organizzare tutto il necessario nel più breve tempo possibile.
+Per procedere al rinnovo di uno o più documenti in scadenza, è sufficiente rispondere direttamente a questa email${contattoTxt?' '+contattoTxt:''}. Provvederemo a organizzare tutto il necessario nel più breve tempo possibile.
 
 2. Variazioni aziendali
-In caso di cambiamenti in azienda — quali nuove assunzioni, cambi di mansione, modifiche organizzative o acquisto di nuovi macchinari/attrezzature — Vi chiediamo di aggiornarci tempestivamente, sempre via email o WhatsApp. Queste informazioni sono essenziali per mantenere la documentazione conforme al D.lgs. 81/08 e garantire la tutela di tutti i lavoratori.
+In caso di cambiamenti in azienda — quali nuove assunzioni, cambi di mansione, modifiche organizzative o acquisto di nuovi macchinari/attrezzature — Vi chiediamo di aggiornarci tempestivamente, ${canaleTxt}. Queste informazioni sono essenziali per mantenere la documentazione conforme al D.lgs. 81/08 e garantire la tutela di tutti i lavoratori.
 
-Cordiali Saluti dallo STUDIO INGEGNERIA LUONGO
-Email: info@studioingegnerialuongo.com
-WhatsApp: 0812597443`;
+Cordiali saluti
+${mitt}
+${firmaRighe.join('\n')}`;
 
   // Mostra modal anteprima
   const overlay = document.getElementById('modalOverlay');
@@ -935,7 +942,7 @@ WhatsApp: 0812597443`;
     <h3>📧 Anteprima Email — ${c.nome}</h3>
     <div style="font-size:11px;color:var(--text3);margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap;">
       <span><strong>A:</strong> ${c.email}</span>
-      <span><strong>CC:</strong> info@studioingegnerialuongo.com</span>
+      ${em?`<span><strong>CC:</strong> ${escH(em)}</span>`:''}
       <span><strong>Oggetto:</strong> ${oggetto}</span>
     </div>
     <div id="emailPreview" style="background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:20px 22px;font-size:13px;line-height:1.7;color:var(--text);max-height:420px;overflow-y:auto;">
@@ -945,15 +952,16 @@ WhatsApp: 0812597443`;
       ${righeHtml}
       <p style="margin:0 0 10px 0;"><strong>Come procedere all'aggiornamento:</strong></p>
       <p style="margin:0 0 6px 0;"><strong>1. Rinnovo e aggiornamento scadenze</strong></p>
-      <p style="margin:0 0 16px 0;">Per procedere al rinnovo di uno o più documenti in scadenza, è sufficiente rispondere direttamente a questa email oppure contattarci su WhatsApp al <strong>0812597443</strong>. Provvederemo a organizzare tutto il necessario nel più breve tempo possibile.</p>
+      <p style="margin:0 0 16px 0;">Per procedere al rinnovo di uno o più documenti in scadenza, è sufficiente rispondere direttamente a questa email${wa?` oppure contattarci su WhatsApp al <strong>${escH(wa)}</strong>`:(tel?` oppure telefonarci al <strong>${escH(tel)}</strong>`:'')}. Provvederemo a organizzare tutto il necessario nel più breve tempo possibile.</p>
       <p style="margin:0 0 6px 0;"><strong>2. Variazioni aziendali</strong></p>
-      <p style="margin:0 0 16px 0;">In caso di cambiamenti in azienda — quali nuove assunzioni, cambi di mansione, modifiche organizzative o acquisto di nuovi macchinari/attrezzature — Vi chiediamo di aggiornarci tempestivamente, sempre via email o WhatsApp. Queste informazioni sono essenziali per mantenere la documentazione conforme al D.lgs. 81/08 e garantire la tutela di tutti i lavoratori.</p>
-      <p style="margin:0 0 4px 0;">Cordiali Saluti dallo <strong>STUDIO INGEGNERIA LUONGO</strong></p>
-      <p style="margin:0 0 4px 0;">Email: info@studioingegnerialuongo.com</p>
-      <p style="margin:0;">WhatsApp: 0812597443</p>
+      <p style="margin:0 0 16px 0;">In caso di cambiamenti in azienda — quali nuove assunzioni, cambi di mansione, modifiche organizzative o acquisto di nuovi macchinari/attrezzature — Vi chiediamo di aggiornarci tempestivamente, ${canaleTxt}. Queste informazioni sono essenziali per mantenere la documentazione conforme al D.lgs. 81/08 e garantire la tutela di tutti i lavoratori.</p>
+      <p style="margin:0 0 4px 0;">Cordiali saluti</p>
+      <p style="margin:0 0 4px 0;"><strong>${escH(mitt)}</strong></p>
+      ${firmaRighe.map(r=>`<p style="margin:0 0 2px 0;color:var(--text2);">${escH(r)}</p>`).join('')}
+      ${!it.salvata&&!it.nome?`<p style="margin:10px 0 0;color:var(--red);font-size:12px;">⚠️ Compila l'intestazione in ⚙️ Account per firmare le email con i tuoi dati.</p>`:''}
     </div>
-    <div style="background:#fbf1e7;border:1px solid #efd3bb;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-top:14px;">
-      💡 <strong>Come inviare:</strong> Clicca <em>"Apri Email"</em> — si apre Zoho Mail (o il tuo client email) con tutto già compilato. Premi solo Invio.
+    <div style="background:#fbf1e7;border:1px solid #efd3bb;border-radius:8px;padding:10px 14px;font-size:12px;color:#7a4a1d;margin-top:14px;">
+      💡 <strong>Come inviare:</strong> clicca <em>"Apri Email"</em>: si apre il tuo programma di posta con tutto già compilato. Premi solo Invio. Firma e dati di contatto si modificano da ⚙️ Account → Intestazione.
     </div>
     <div class="fa" style="gap:10px;">
       <button class="btn btn-secondary" onclick="closeModal()">Chiudi</button>
@@ -982,8 +990,8 @@ function apriEmailClient() {
   if (!window._emailData) return;
   const { dest, oggetto, testo } = window._emailData;
   const mailto = 'mailto:' + dest
-    + '?cc=' + encodeURIComponent('info@studioingegnerialuongo.com')
-    + '&subject=' + encodeURIComponent(oggetto)
+    + '?' + (window._emailCC ? 'cc=' + encodeURIComponent(window._emailCC) + '&' : '')
+    + 'subject=' + encodeURIComponent(oggetto)
     + '&body=' + encodeURIComponent(testo);
   window.location.href = mailto;
 }
@@ -1552,6 +1560,7 @@ async function apriSpazio(sid){
   db={aziende:(data||[]).map(r=>{ SYNC.ver[r.id]=r.versione; SYNC.saved[r.id]=JSON.stringify(r.dati); return r.dati; })};
   db.aziende.sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'it'));
   SYNC.attivo=true; SYNC.ready=true;
+  await caricaIntestazione();
   migraDati();
   await flush();                       // salva eventuali dati aggiornati dalla migrazione
   allineaScadenze(scadSalvate);        // prepara l'elenco scadenze per gli avvisi email
@@ -1569,6 +1578,14 @@ async function allineaScadenze(salvate){
     try{ await sb.from('aziende').update({scadenze:sc}).eq('spazio_id',SYNC.spazio).eq('id',c.id); }catch(e){ console.warn(e); }
   }
 }
+
+// --- intestazione del gestionale (firma email, CC, documenti) ---
+async function caricaIntestazione(){
+  try{ const {data,error}=await sb.rpc('intestazione_spazio',{s:SYNC.spazio}); if(error) throw error; SYNC.intest=data||{}; }
+  catch(e){ console.warn('Intestazione non disponibile',e); SYNC.intest={}; }
+  const sub=document.querySelector('.ah-sub'); if(sub) sub.textContent=(SYNC.intest&&SYNC.intest.nome)||'Scadenze D.Lgs. 81/08';
+}
+function I(){ return SYNC.intest||{}; }
 
 // --- tempo reale: modifiche dei colleghi ---
 function sottoscriviCambi(sid){
@@ -1769,6 +1786,13 @@ async function apriAccount(){
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;">
     <input type="checkbox" id="acc_avvisi" style="width:auto;" ${(SYNC.me&&SYNC.me.avvisi_email!==false)?'checked':''} onchange="salvaAvvisi(this.checked)">
     Ricevi ogni mattina un'email con le scadenze a 30 giorni, a 7 giorni e scadute</label></div>
+  <div class="fg"><label>Intestazione per email e documenti</label>
+    <div style="font-size:12px;color:var(--text3);margin:-2px 0 10px;">Questi dati compaiono come firma nelle email di riepilogo alle aziende, come indirizzo in copia (CC) e nei documenti Word.${tit?'':' Può modificarli solo il titolare.'}</div>
+    <div class="fr"><div><label>Studio / Azienda</label><input type="text" id="in_nome" ${tit?'':'disabled'}></div><div><label>Referente</label><input type="text" id="in_ref" ${tit?'':'disabled'}></div></div>
+    <div class="fr"><div><label>Email (in copia nelle email)</label><input type="email" id="in_email" ${tit?'':'disabled'}></div><div><label>Telefono</label><input type="text" id="in_tel" ${tit?'':'disabled'}></div></div>
+    <div class="fr"><div><label>WhatsApp</label><input type="text" id="in_wa" ${tit?'':'disabled'}></div><div><label>P.IVA</label><input type="text" id="in_piva" ${tit?'':'disabled'}></div></div>
+    <div class="fg" style="margin-bottom:8px;"><label>Indirizzo</label><input type="text" id="in_ind" ${tit?'':'disabled'}></div>
+    ${tit?`<button class="btn btn-secondary btn-sm" onclick="salvaIntestazione()">Salva intestazione</button>`:''}</div>
   ${tit?`<div class="fg"><label>Avvisi su Telegram</label><div id="acc_tg" style="font-size:13px;color:var(--text2);">Caricamento…</div></div>`:''}
   <div class="fg"><label>Cambia la tua password</label>
     <div style="display:flex;gap:8px;"><input id="acc_pw" type="password" placeholder="Nuova password (min. 6 caratteri)" style="flex:1;"><button class="btn btn-secondary" onclick="cambiaPassword()">Aggiorna</button></div></div>
@@ -1776,6 +1800,7 @@ async function apriAccount(){
   <div class="fa"><button class="btn btn-danger" onclick="esci()">⎋ Esci</button><button class="btn btn-secondary" onclick="closeModal()">Chiudi</button></div>`;
   caricaMembri();
   if(tit) caricaTelegram();
+  const it=I(); [['in_nome','nome'],['in_ref','referente'],['in_email','email'],['in_tel','telefono'],['in_wa','whatsapp'],['in_piva','piva'],['in_ind','indirizzo']].forEach(([id,k])=>{ const e=document.getElementById(id); if(e) e.value=it[k]||''; });
 }
 let TG_TIMER=null;
 async function caricaTelegram(){
@@ -1849,6 +1874,13 @@ async function rinominaSpazio(){
   const n=v('acc_nome'); const {error}=await sb.rpc('rinomina_spazio',{s:SYNC.spazio,nuovo_nome:n});
   if(error){ accMsg(erroreIT(error)); return; }
   await aggiornaSpazi(); accMsg('Nome salvato.',true);
+}
+async function salvaIntestazione(){
+  const d={nome:v('in_nome'),referente:v('in_ref'),email:v('in_email'),telefono:v('in_tel'),whatsapp:v('in_wa'),piva:v('in_piva'),indirizzo:v('in_ind')};
+  if(!d.nome){ accMsg('Inserisci almeno il nome dello studio o dell\'azienda.'); return; }
+  const {error}=await sb.rpc('salva_intestazione',{s:SYNC.spazio,dati:d});
+  if(error){ accMsg(erroreIT(error)); return; }
+  await caricaIntestazione(); accMsg('Intestazione salvata.',true);
 }
 async function salvaAvvisi(on){
   const {error}=await sb.rpc('imposta_avvisi',{attivi:on});
@@ -2225,7 +2257,8 @@ async function scaricaWord() {
   }
 
   body += emptyPar();
-  body += par(run('Studio Ingegneria Luongo  |  info@studioingegnerialuongo.com  |  WhatsApp: 0812597443',{size:8,color:TESTO3}),{align:'center'});
+  const itw=I(); const piede=[itw.nome, itw.email, itw.telefono?('Tel. '+itw.telefono):'', (itw.whatsapp&&itw.whatsapp!==itw.telefono)?('WhatsApp: '+itw.whatsapp):'', itw.piva?('P.IVA '+itw.piva):''].filter(Boolean).join('  |  ');
+  if(piede) body += par(run(piede,{size:8,color:TESTO3}),{align:'center'});
 
   const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
