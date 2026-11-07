@@ -5,9 +5,9 @@ window.SAFETRACK_CONFIG = {
   SUPABASE_ANON_KEY: "sb_publishable__ZStG5QNh-U7YXRoX47uQA_vvmLGEx3",
 
   // Contatti mostrati ai clienti in attesa di attivazione o con abbonamento scaduto
-  CONTATTO_EMAIL: "info@studioingegnerialuongo.com",
-  CONTATTO_TELEFONO: "",
-  CONTATTO_WHATSAPP: "0812597443",              // mostrato nel sito di presentazione
+  CONTATTO_EMAIL: "alfonsogiorgiosmart@gmail.com",
+  CONTATTO_TELEFONO: "338 523 5897",
+  CONTATTO_WHATSAPP: "338 523 5897",              // mostrato nel sito di presentazione
 
   // Link all'informativa privacy (facoltativo)
   PRIVACY_URL: ""

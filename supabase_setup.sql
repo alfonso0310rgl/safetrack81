@@ -906,6 +906,88 @@ grant execute on function public.admin_richieste() to authenticated;
 grant execute on function public.admin_richiesta_gestita(bigint, boolean) to authenticated;
 
 -- =====================================================================
+-- NOTIZIE SULLA SICUREZZA PER IL SITO (feed ufficiali, aggiornati ogni 4 ore)
+-- =====================================================================
+create table if not exists public.notizie (
+  id bigserial primary key, fonte text not null, titolo text not null, link text not null unique,
+  sommario text, data_pub date, visto_il timestamptz not null default now()
+);
+alter table public.notizie enable row level security;
+revoke all on public.notizie from anon, authenticated;
+grant select on public.notizie to anon, authenticated;
+drop policy if exists notizie_pubbliche on public.notizie;
+create policy notizie_pubbliche on public.notizie for select to anon, authenticated using (true);
+
+create table if not exists public.fonti_notizie (
+  fonte text primary key, url text not null, filtro text, escludi text, attiva boolean not null default true, ultima_richiesta bigint
+);
+alter table public.fonti_notizie add column if not exists escludi text;
+alter table public.fonti_notizie enable row level security;
+revoke all on public.fonti_notizie from anon, authenticated;
+insert into public.fonti_notizie (fonte, url, filtro, escludi) values
+  ('PuntoSicuro', 'https://www.puntosicuro.it/feed.rss', null, '(newsletter|iscriviti|abbonati|abbonamento|webinar gratuito|pubbliredazionale)'),
+  ('INAIL', 'https://www.inail.it/portale/it.rss.news.xml', '(prevenzion|sicurezz|infortun|malatti|rischi|bando isi|incentiv|salute e sicurezza|formazion|ispezion|normativ|decreto|circolar|dpi|cantier|amianto|stress lavoro|ergonom|vigilanza|premi|tariff|autoliquidazion|denunc)', '(arteterapia|sport paralimpic|caduti in guerra|open day|concorso|mobilità|graduatori|assunzion)'),
+  ('INPS', 'https://www.inps.it/it/it.rss.news.xml', '(sicurezz|infortun|malattia|salute|prevenzion|81/08|datori di lavoro|ispezion|lavoro sommerso|durc)', '(pension|giornalist|parasubordinat|riscatto|bonus|naspi|assegno unico)')
+on conflict (fonte) do nothing;
+
+create or replace function public.st81_testo(t text, maxlen int default 260) returns text
+language sql immutable as $$
+  select nullif(left(trim(regexp_replace(regexp_replace(regexp_replace(coalesce(t, ''), '<[^>]*>', ' ', 'g'), '&nbsp;|&#160;', ' ', 'g'), '\s+', ' ', 'g')), maxlen), '');
+$$;
+
+create or replace function public.st81_data_feed(t text) returns date
+language plpgsql immutable as $$
+begin
+  t := trim(coalesce(t, ''));
+  if t = '' then return null; end if;
+  if t ~ '^\d{1,2}/\d{1,2}/\d{4}' then return to_date(substring(t from '^\d{1,2}/\d{1,2}/\d{4}'), 'DD/MM/YYYY'); end if;
+  return t::timestamptz::date;
+exception when others then return null;
+end $$;
+
+create or replace function public.st81_aggiorna_notizie() returns integer
+language plpgsql security definer set search_path = public, extensions as $$
+declare f record; resp text; doc xml; it xml; tit text; lnk text; som text; dt text; nuove integer := 0; n integer;
+begin
+  for f in select * from public.fonti_notizie where attiva and ultima_richiesta is not null loop
+    select content into resp from net._http_response where id = f.ultima_richiesta and status_code = 200;
+    if resp is not null then
+      begin
+        doc := xmlparse(document resp);
+        for it in select unnest(xpath('//item', doc)) loop
+          tit := public.st81_testo((xpath('/item/title/text()', it))[1]::text, 300);
+          lnk := trim((xpath('/item/link/text()', it))[1]::text);
+          som := public.st81_testo((xpath('/item/description/text()', it))[1]::text, 260);
+          dt  := coalesce((xpath('/item/pubDate/text()', it))[1]::text, (xpath('/item/pubdate/text()', it))[1]::text, (xpath('/item/date/text()', it))[1]::text);
+          continue when tit is null or lnk is null or lnk !~ '^https?://';
+          continue when f.filtro is not null and (tit || ' ' || coalesce(som, '')) !~* f.filtro;
+          continue when f.escludi is not null and (tit || ' ' || coalesce(som, '') || ' ' || lnk) ~* f.escludi;
+          insert into public.notizie (fonte, titolo, link, sommario, data_pub)
+          values (f.fonte, tit, lnk, som, public.st81_data_feed(dt))
+          on conflict (link) do nothing;
+          get diagnostics n = row_count; nuove := nuove + n;
+        end loop;
+      exception when others then
+        raise warning 'Feed % non leggibile: %', f.fonte, sqlerrm;
+      end;
+    end if;
+  end loop;
+  update public.fonti_notizie fn
+     set ultima_richiesta = net.http_get(url := fn.url, headers := '{"User-Agent":"Mozilla/5.0 (compatible; SafeTrack81-notizie/1.0)"}'::jsonb, timeout_milliseconds := 20000)
+   where fn.attiva;
+  delete from public.notizie where coalesce(data_pub::timestamptz, visto_il) < now() - interval '180 days';
+  return nuove;
+end $$;
+revoke all on function public.st81_aggiorna_notizie() from public, anon, authenticated;
+
+do $$ begin
+  if exists (select 1 from cron.job where jobname = 'st81-notizie') then perform cron.unschedule('st81-notizie'); end if;
+  if exists (select 1 from cron.job where jobname = 'st81-notizie-elabora') then perform cron.unschedule('st81-notizie-elabora'); end if;
+  perform cron.schedule('st81-notizie', '0 */4 * * *', 'select public.st81_aggiorna_notizie()');
+  perform cron.schedule('st81-notizie-elabora', '3 */4 * * *', 'select public.st81_aggiorna_notizie()');
+end $$;
+
+-- =====================================================================
 -- ULTIMO PASSO: dopo esserti registrato dall'app, rendi amministratore il tuo account.
 -- Sostituisci l'email e riesegui SOLO questa riga:
 -- update public.profili set admin = true where email = 'la-tua-email@esempio.it';

@@ -166,6 +166,26 @@
   .piano.top li::before{color:#fff}
   .tag{display:inline-block;font-size:12px;font-weight:700;background:rgba(255,255,255,.18);color:#fff;padding:4px 10px;border-radius:20px;margin-bottom:14px}
 
+  /* NOTIZIE */
+  .nz-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+  .nz-filtri{display:flex;gap:8px;flex-wrap:wrap}
+  .nz-f{font:inherit;font-size:13.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1.5px solid var(--bordo);background:#fff;color:var(--testo2);cursor:pointer}
+  .nz-f[aria-pressed="true"]{background:var(--caffe);border-color:var(--caffe);color:#fff}
+  .nz-lista{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:32px}
+  .nz{background:#fff;border:1px solid var(--bordo);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:10px;text-decoration:none;transition:border-color .15s}
+  .nz:hover{border-color:var(--terra)}
+  .nz-meta{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--testo3)}
+  .nz-src{font-weight:700;font-size:12px;padding:3px 10px;border-radius:20px}
+  .nz-src.PuntoSicuro{background:#fdf0e5;color:var(--terra2)}
+  .nz-src.INAIL{background:#e6eef7;color:#1d4f86}
+  .nz-src.INPS{background:#e8f2ec;color:#2f6b45}
+  .nz h3{font-family:var(--body);font-size:16.5px;font-weight:700;letter-spacing:0;line-height:1.35;color:var(--testo)}
+  .nz p{font-size:14px;color:var(--testo2);line-height:1.5}
+  .nz-vai{margin-top:auto;font-size:13px;font-weight:600;color:var(--terra)}
+  .nz-piede{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:22px;flex-wrap:wrap;font-size:13px;color:var(--testo3)}
+  .nz-vuoto{grid-column:1/-1;background:#fff;border:1px dashed var(--bordo);border-radius:16px;padding:28px;text-align:center;color:var(--testo2)}
+  @media (max-width:960px){.nz-lista{grid-template-columns:1fr}}
+
   /* FAQ */
   .faq{max-width:780px;margin-top:36px}
   details{border-top:1px solid var(--bordo);padding:18px 0}
@@ -228,6 +248,7 @@
       <a href="#come-funziona">Come funziona</a>
       <a href="#demo">Demo</a>
       <a href="#vantaggi">Vantaggi</a>
+      <a href="#notizie">Notizie</a>
       <a href="#abbonamento">Abbonamento</a>
       <a href="#domande">Domande</a>
     </nav>
@@ -372,6 +393,26 @@
   </div>
 </section>
 
+<!-- NOTIZIE -->
+<section id="notizie" style="padding-top:0">
+  <div class="wrap">
+    <div class="nz-head">
+      <div>
+        <h2>Le ultime novità su sicurezza e D.Lgs. 81/08.</h2>
+        <p class="lead">Aggiornate in automatico più volte al giorno dalle fonti di riferimento: INAIL, INPS e PuntoSicuro.</p>
+      </div>
+      <div class="nz-filtri" role="group" aria-label="Filtra per fonte">
+        <button class="nz-f" type="button" aria-pressed="true" data-f="">Tutte</button>
+        <button class="nz-f" type="button" aria-pressed="false" data-f="INAIL">INAIL</button>
+        <button class="nz-f" type="button" aria-pressed="false" data-f="INPS">INPS</button>
+        <button class="nz-f" type="button" aria-pressed="false" data-f="PuntoSicuro">PuntoSicuro</button>
+      </div>
+    </div>
+    <div class="nz-lista" id="nzLista" aria-live="polite"><div class="nz-vuoto">Caricamento delle notizie…</div></div>
+    <div class="nz-piede"><span>I titoli rimandano agli articoli originali, pubblicati e di proprietà delle rispettive fonti.</span><button class="btn btn-g" type="button" id="nzAltre" style="display:none" onclick="nzMostra(nzN+6)">Mostra altre notizie</button></div>
+  </div>
+</section>
+
 <!-- DOMANDE -->
 <section id="domande">
   <div class="wrap">
@@ -435,7 +476,7 @@ addEventListener('scroll', () => document.getElementById('nav').classList.toggle
 // ---------- contatti diretti ----------
 (function(){
   const c = [];
-  if (CFG.CONTATTO_EMAIL) c.push(`<a class="canale" href="mailto:${esc(CFG.CONTATTO_EMAIL)}"><span class="v-ic">📧</span><div><b>Scrivici</b><span>${esc(CFG.CONTATTO_EMAIL)}</span></div></a>`);
+  if (CFG.CONTATTO_EMAIL) c.push(`<a class="canale" href="mailto:${esc(CFG.CONTATTO_EMAIL)}"><span class="v-ic">📧</span><div><b>Scrivi al consulente</b><span>${esc(CFG.CONTATTO_EMAIL)}</span></div></a>`);
   const wa = String(CFG.CONTATTO_WHATSAPP || '').replace(/\D/g, '');
   if (wa) c.push(`<a class="canale" href="https://wa.me/${wa.startsWith('39') ? wa : '39' + wa}" target="_blank" rel="noopener"><span class="v-ic">💬</span><div><b>WhatsApp</b><span>${esc(CFG.CONTATTO_WHATSAPP)}</span></div></a>`);
   if (CFG.CONTATTO_TELEFONO) c.push(`<a class="canale" href="tel:${esc(String(CFG.CONTATTO_TELEFONO).replace(/\s/g,''))}"><span class="v-ic">📞</span><div><b>Chiamaci</b><span>${esc(CFG.CONTATTO_TELEFONO)}</span></div></a>`);
@@ -476,6 +517,38 @@ async function inviaRichiesta(ev){
     b.disabled = false; b.textContent = 'Invia la richiesta';
   }
 }
+
+// ---------- NOTIZIE ----------
+let NZ=[], nzF='', nzN=6;
+const nzData = n => new Date(n.data_pub || n.visto_il);
+async function nzCarica(){
+  const box = document.getElementById('nzLista');
+  if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) { box.innerHTML = '<div class="nz-vuoto">Notizie non disponibili.</div>'; return; }
+  try {
+    const r = await fetch(CFG.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/notizie?select=fonte,titolo,link,sommario,data_pub,visto_il&order=visto_il.desc&limit=120',
+      {headers:{'apikey':CFG.SUPABASE_ANON_KEY,'Authorization':'Bearer ' + CFG.SUPABASE_ANON_KEY}});
+    if (!r.ok) throw new Error();
+    NZ = (await r.json()).sort((a,b) => nzData(b) - nzData(a));
+    nzMostra(6);
+  } catch(e) { box.innerHTML = '<div class="nz-vuoto">Non è stato possibile caricare le notizie. Riprova più tardi.</div>'; }
+}
+function nzMostra(n){
+  nzN = n;
+  const lista = NZ.filter(x => !nzF || x.fonte === nzF);
+  const box = document.getElementById('nzLista');
+  box.innerHTML = lista.length ? lista.slice(0, n).map(x => {
+    const s = x.sommario ? (x.sommario.length > 170 ? x.sommario.slice(0, 167).replace(/\s+\S*$/, '') + '…' : x.sommario) : '';
+    return `<a class="nz" href="${esc(x.link)}" target="_blank" rel="noopener">
+      <div class="nz-meta"><span class="nz-src ${esc(x.fonte)}">${esc(x.fonte)}</span><span>${nzData(x).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})}</span></div>
+      <h3>${esc(x.titolo)}</h3>${s ? `<p>${esc(s)}</p>` : ''}<span class="nz-vai">Leggi su ${esc(x.fonte === 'PuntoSicuro' ? 'puntosicuro.it' : x.fonte.toLowerCase() + '.it')}</span></a>`;
+  }).join('') : '<div class="nz-vuoto">Nessuna notizia recente da questa fonte.</div>';
+  document.getElementById('nzAltre').style.display = lista.length > n ? '' : 'none';
+}
+document.querySelectorAll('.nz-f').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.nz-f').forEach(x => x.setAttribute('aria-pressed', x === b));
+  nzF = b.dataset.f; nzMostra(6);
+}));
+nzCarica();
 
 // ---------- DEMO ----------
 const OGGI = new Date(); OGGI.setHours(0,0,0,0);

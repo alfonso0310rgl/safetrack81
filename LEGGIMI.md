@@ -132,6 +132,10 @@ Il sito per presentare il gestionale ai potenziali clienti è su `https://alfons
 - Ogni richiesta inviata dal modulo arriva via email agli amministratori.
 - Le richieste compaiono anche in **👥 Clienti e abbonati → Richieste dal sito**, dove puoi segnarle come gestite.
 - Email e WhatsApp mostrati nel sito si cambiano in `config.js` (`CONTATTO_EMAIL`, `CONTATTO_WHATSAPP`, `CONTATTO_TELEFONO`).
+- **Notizie**:
+  - La sezione "Le ultime novità" si aggiorna da sola ogni 4 ore dai feed ufficiali di INAIL, INPS e PuntoSicuro.
+  - Vengono tenuti solo gli argomenti di sicurezza sul lavoro: filtri per parole chiave nella tabella `fonti_notizie`.
+  - Ogni titolo rimanda all'articolo originale.
 
 ## Da sapere
 - **Backup automatico**: ogni giorno viene salvata una copia nel database (tabella `backup`) e vengono tenuti gli ultimi 30 giorni. Puoi sempre fare anche **📥 Esporta**.
