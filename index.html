@@ -1984,6 +1984,10 @@ async function caricaRichieste(){
   if(error){ box.textContent='Errore: '+erroreIT(error); return; }
   RICH=data||[]; renderRichieste();
 }
+function livelloChip(r){
+  const m={caldo:['🔥 Caldo','#dc2626','#fff'],tiepido:['Tiepido','#fef9c3','#854d0e'],freddo:['Freddo','#eef2f6','#52606d']}[r.livello];
+  return m?`<span class="chip" style="background:${m[1]};color:${m[2]};" title="Punteggio di interesse ${r.punteggio??'—'}/14">${m[0]}</span>`:'';
+}
 function renderRichieste(){
   const box=document.getElementById('richLista'); if(!box) return;
   const tutte=document.getElementById('richTutte').checked;
@@ -1993,7 +1997,8 @@ function renderRichieste(){
   if(!lista.length){ box.innerHTML='<div style="padding:8px 0;">Nessuna richiesta '+(tutte?'':'da gestire')+'. Condividi il link del sito per riceverne.</div>'; return; }
   box.innerHTML=lista.map(r=>`<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border);${r.gestita?'opacity:.55;':''}">
     <div style="flex:1;min-width:0;color:var(--text);">
-      <div style="font-weight:700;">${escH(r.nome)}${r.azienda?` <span style="font-weight:500;color:var(--text2);">— ${escH(r.azienda)}</span>`:''}</div>
+      <div style="font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${livelloChip(r)}<span>${escH(r.nome)}${r.azienda?` <span style="font-weight:500;color:var(--text2);">— ${escH(r.azienda)}</span>`:''}</span></div>
+      ${(r.ruolo||r.strumento||r.tempi)?`<div style="font-size:12px;color:var(--text2);margin-top:3px;">${[r.ruolo,r.strumento?'oggi usa: '+r.strumento:'',r.tempi?'inizio: '+r.tempi:''].filter(Boolean).map(escH).join(' &nbsp;·&nbsp; ')}</div>`:''}
       <div style="font-size:12px;color:var(--text2);margin-top:2px;">📧 <a href="mailto:${escH(r.email)}" style="color:var(--accent);">${escH(r.email)}</a>${r.telefono?` &nbsp; 📞 ${escH(r.telefono)}`:''}${r.n_aziende?` &nbsp; 🏢 ${escH(r.n_aziende)} aziende`:''}</div>
       ${r.messaggio?`<div style="font-size:12.5px;color:var(--text2);margin-top:6px;background:var(--bg);border-radius:8px;padding:8px 10px;white-space:pre-line;">${escH(r.messaggio)}</div>`:''}
     </div>

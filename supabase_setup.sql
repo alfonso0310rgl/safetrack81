@@ -858,24 +858,48 @@ grant usage, select on sequence public.richieste_contatto_id_seq to anon, authen
 drop policy if exists richieste_inserisci on public.richieste_contatto;
 create policy richieste_inserisci on public.richieste_contatto for insert to anon, authenticated with check (gestita = false);
 
+alter table public.richieste_contatto add column if not exists ruolo     text check (char_length(ruolo) <= 60);
+alter table public.richieste_contatto add column if not exists strumento text check (char_length(strumento) <= 60);
+alter table public.richieste_contatto add column if not exists tempi     text check (char_length(tempi) <= 60);
+alter table public.richieste_contatto add column if not exists punteggio integer;
+alter table public.richieste_contatto add column if not exists livello   text;
+grant insert (nome, azienda, email, telefono, n_aziende, messaggio, ruolo, strumento, tempi) on public.richieste_contatto to anon, authenticated;
+
+-- antispam, punteggio di interesse (caldo / tiepido / freddo) e notifica email agli amministratori
 create or replace function public.st81_nuova_richiesta() returns trigger
 language plpgsql security definer set search_path = public as $$
-declare dest record; html text;
+declare dest record; html text; p integer := 0; ico text; ogg text;
 begin
   if (select count(*) from public.richieste_contatto where lower(email) = lower(new.email) and creata_il > now() - interval '1 hour') >= 3
      or (select count(*) from public.richieste_contatto where creata_il > now() - interval '1 hour') >= 40 then
     raise exception 'Troppe richieste: riprova più tardi';
   end if;
+  p := p + case when new.ruolo ~* 'consulen|rspp' then 3 when new.ruolo ~* 'azienda' then 2 else 0 end;
+  p := p + case when new.n_aziende ~ 'Più di 80|31' then 3 when new.n_aziende ~ '11' then 2 when new.n_aziende ~ '1–10|1-10' then 1 else 0 end;
+  p := p + case when new.tempi ~* 'subito' then 4 when new.tempi ~* '1.?3 mesi|mesi' then 2 else 0 end;
+  p := p + case when new.strumento ~* 'gestionale' then 2 when new.strumento ~* 'excel|carta' then 1 else 0 end;
+  p := p + case when coalesce(new.telefono, '') ~ '\d{6,}' then 1 else 0 end;
+  p := p + case when char_length(coalesce(new.messaggio, '')) >= 40 then 1 else 0 end;
+  if new.email ~* '@(mailinator|yopmail|guerrillamail|10minutemail|tempmail|trashmail)\.' then p := 0; end if;
+  new.punteggio := p;
+  new.livello := case when p >= 9 then 'caldo' when p >= 5 then 'tiepido' else 'freddo' end;
+  ico := case new.livello when 'caldo' then '🔥 Contatto CALDO' when 'tiepido' then '🙂 Contatto tiepido' else '❄️ Contatto freddo' end;
   if public.st81_email_configurata() then
     html := '<div style="font-family:Arial,sans-serif;font-size:14px;color:#2b2119;line-height:1.6;">'
-      || '<div style="background:#2e231b;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0;font-weight:700;">🛡️ SafeTrack 81 — Nuova richiesta dal sito</div>'
+      || '<div style="background:#2e231b;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0;font-weight:700;">🛡️ SafeTrack 81 — ' || ico || ' (' || p || '/14)</div>'
       || '<div style="border:1px solid #e9e0d3;border-top:none;padding:16px 18px;border-radius:0 0 10px 10px;">'
       || '<p><strong>' || st81_html(new.nome) || '</strong>' || coalesce(' — ' || st81_html(nullif(new.azienda, '')), '') || '</p>'
-      || '<p>📧 ' || st81_html(new.email) || coalesce('<br>📞 ' || st81_html(nullif(new.telefono, '')), '') || coalesce('<br>🏢 Aziende gestite: ' || st81_html(nullif(new.n_aziende, '')), '') || '</p>'
+      || '<p>📧 ' || st81_html(new.email) || coalesce('<br>📞 ' || st81_html(nullif(new.telefono, '')), '') || '</p>'
+      || '<table style="font-size:13px;border-collapse:collapse;margin:6px 0 10px;">'
+      || '<tr><td style="color:#6a5a4b;padding:2px 12px 2px 0;">Chi è</td><td><strong>' || coalesce(st81_html(nullif(new.ruolo, '')), '—') || '</strong></td></tr>'
+      || '<tr><td style="color:#6a5a4b;padding:2px 12px 2px 0;">Aziende gestite</td><td><strong>' || coalesce(st81_html(nullif(new.n_aziende, '')), '—') || '</strong></td></tr>'
+      || '<tr><td style="color:#6a5a4b;padding:2px 12px 2px 0;">Oggi usa</td><td><strong>' || coalesce(st81_html(nullif(new.strumento, '')), '—') || '</strong></td></tr>'
+      || '<tr><td style="color:#6a5a4b;padding:2px 12px 2px 0;">Vuole iniziare</td><td><strong>' || coalesce(st81_html(nullif(new.tempi, '')), '—') || '</strong></td></tr></table>'
       || coalesce('<p style="background:#f8f4ee;padding:10px 12px;border-radius:8px;white-space:pre-line;">' || st81_html(nullif(new.messaggio, '')) || '</p>', '')
-      || '<p style="font-size:12px;color:#6a5a4b;">Rispondi direttamente a questa persona, oppure trova la richiesta in SafeTrack 81 → Clienti e abbonati.</p></div></div>';
-    for dest in select u.email from public.profili p join auth.users u on u.id = p.user_id where p.admin and u.email is not null loop
-      perform public.st81_invia_email(dest.email, 'Nuova richiesta dal sito: ' || new.nome || coalesce(' (' || nullif(new.azienda, '') || ')', ''), html);
+      || '<p style="font-size:12px;color:#6a5a4b;">Trovi tutte le richieste, ordinate per interesse, in SafeTrack 81 → Clienti e abbonati.</p></div></div>';
+    ogg := ico || ': ' || new.nome || coalesce(' (' || nullif(new.azienda, '') || ')', '');
+    for dest in select u.email from public.profili pr join auth.users u on u.id = pr.user_id where pr.admin and u.email is not null loop
+      perform public.st81_invia_email(dest.email, ogg, html);
     end loop;
   end if;
   return new;
@@ -888,7 +912,7 @@ returns setof public.richieste_contatto
 language plpgsql security definer stable set search_path = public as $$
 begin
   if not public.is_admin() then raise exception 'Solo l''amministratore'; end if;
-  return query select * from public.richieste_contatto order by gestita, creata_il desc limit 300;
+  return query select * from public.richieste_contatto order by gestita, coalesce(punteggio, 0) desc, creata_il desc limit 300;
 end $$;
 
 create or replace function public.admin_richiesta_gestita(rid bigint, valore boolean)

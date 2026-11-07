@@ -445,8 +445,18 @@
           <div class="fld"><label for="c_email">Email</label><input id="c_email" type="email" autocomplete="email" required></div>
           <div class="fld"><label for="c_tel">Telefono</label><input id="c_tel" type="tel" autocomplete="tel"></div>
         </div>
-        <div class="fld"><label for="c_n">Quante aziende gestisci?</label>
-          <select id="c_n"><option value="">Seleziona</option><option>1–10</option><option>11–30</option><option>31–80</option><option>Più di 80</option></select></div>
+        <div class="fr">
+          <div class="fld"><label for="c_ruolo">Chi sei?</label>
+            <select id="c_ruolo"><option value="">Seleziona</option><option>Consulente o studio di sicurezza</option><option>RSPP esterno</option><option>Azienda (datore di lavoro, HR)</option><option>Altro</option></select></div>
+          <div class="fld"><label for="c_n">Quante aziende segui?</label>
+            <select id="c_n"><option value="">Seleziona</option><option>1–10</option><option>11–30</option><option>31–80</option><option>Più di 80</option></select></div>
+        </div>
+        <div class="fr">
+          <div class="fld"><label for="c_str">Come gestisci oggi le scadenze?</label>
+            <select id="c_str"><option value="">Seleziona</option><option>Excel o carta</option><option>Un altro gestionale</option><option>Non in modo organizzato</option></select></div>
+          <div class="fld"><label for="c_tempi">Quando vorresti iniziare?</label>
+            <select id="c_tempi"><option value="">Seleziona</option><option>Subito, entro 2 settimane</option><option>Entro 1–3 mesi</option><option>Mi sto solo informando</option></select></div>
+        </div>
         <div class="fld"><label for="c_msg">Messaggio</label><textarea id="c_msg" placeholder="Ad esempio: seguo 40 aziende nel settore alimentare e oggi uso Excel."></textarea></div>
         <div class="hp" aria-hidden="true"><label for="c_web">Lascia vuoto</label><input id="c_web" tabindex="-1" autocomplete="off"></div>
         <label class="chk"><input type="checkbox" id="c_priv"><span>Acconsento al trattamento dei dati per essere ricontattato in merito a SafeTrack 81.</span></label>
@@ -489,15 +499,18 @@ function scegliPiano(p){
 }
 
 // ---------- modulo di contatto ----------
+const T0 = Date.now();
 async function inviaRichiesta(ev){
   ev.preventDefault();
   const g = id => document.getElementById(id).value.trim();
   const msg = document.getElementById('cfMsg');
   const err = t => { msg.textContent = t; msg.style.color = 'var(--rosso)'; };
   if (g('c_web')) return; // spam
-  const d = {nome:g('c_nome'), azienda:g('c_az'), email:g('c_email'), telefono:g('c_tel'), n_aziende:g('c_n'), messaggio:g('c_msg')};
+  const d = {nome:g('c_nome'), azienda:g('c_az'), email:g('c_email'), telefono:g('c_tel'), n_aziende:g('c_n'), messaggio:g('c_msg'), ruolo:g('c_ruolo'), strumento:g('c_str'), tempi:g('c_tempi')};
+  if (Date.now() - T0 < 4000) return; // compilato troppo in fretta: probabilmente un programma automatico
   if (!d.nome) return err('Scrivi il tuo nome.');
   if (!/^\S+@\S+\.\S+$/.test(d.email)) return err('Scrivi un indirizzo email valido, così possiamo risponderti.');
+  if (!d.ruolo || !d.n_aziende || !d.tempi) return err('Rispondi alle domande su chi sei, quante aziende segui e quando vorresti iniziare: ci servono per prepararti una proposta adatta.');
   if (!document.getElementById('c_priv').checked) return err('Per inviare la richiesta serve il consenso al trattamento dei dati.');
   if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) return err('Modulo non configurato: scrivici direttamente via email.');
   const b = document.getElementById('cfBtn'); b.disabled = true; b.textContent = 'Invio in corso…';
