@@ -838,6 +838,74 @@ do $$ begin
 end $$;
 
 -- =====================================================================
+-- RICHIESTE DI CONTATTO DAL SITO DI PRESENTAZIONE
+-- =====================================================================
+create table if not exists public.richieste_contatto (
+  id          bigserial primary key,
+  creata_il   timestamptz not null default now(),
+  nome        text not null check (char_length(nome) between 1 and 120),
+  azienda     text check (char_length(azienda) <= 160),
+  email       text not null check (email ~ '^\S+@\S+\.\S+$' and char_length(email) <= 160),
+  telefono    text check (char_length(telefono) <= 40),
+  n_aziende   text check (char_length(n_aziende) <= 40),
+  messaggio   text check (char_length(messaggio) <= 3000),
+  gestita     boolean not null default false
+);
+alter table public.richieste_contatto enable row level security;
+revoke all on public.richieste_contatto from anon, authenticated;
+grant insert (nome, azienda, email, telefono, n_aziende, messaggio) on public.richieste_contatto to anon, authenticated;
+grant usage, select on sequence public.richieste_contatto_id_seq to anon, authenticated;
+drop policy if exists richieste_inserisci on public.richieste_contatto;
+create policy richieste_inserisci on public.richieste_contatto for insert to anon, authenticated with check (gestita = false);
+
+create or replace function public.st81_nuova_richiesta() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare dest record; html text;
+begin
+  if (select count(*) from public.richieste_contatto where lower(email) = lower(new.email) and creata_il > now() - interval '1 hour') >= 3
+     or (select count(*) from public.richieste_contatto where creata_il > now() - interval '1 hour') >= 40 then
+    raise exception 'Troppe richieste: riprova più tardi';
+  end if;
+  if public.st81_email_configurata() then
+    html := '<div style="font-family:Arial,sans-serif;font-size:14px;color:#2b2119;line-height:1.6;">'
+      || '<div style="background:#2e231b;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0;font-weight:700;">🛡️ SafeTrack 81 — Nuova richiesta dal sito</div>'
+      || '<div style="border:1px solid #e9e0d3;border-top:none;padding:16px 18px;border-radius:0 0 10px 10px;">'
+      || '<p><strong>' || st81_html(new.nome) || '</strong>' || coalesce(' — ' || st81_html(nullif(new.azienda, '')), '') || '</p>'
+      || '<p>📧 ' || st81_html(new.email) || coalesce('<br>📞 ' || st81_html(nullif(new.telefono, '')), '') || coalesce('<br>🏢 Aziende gestite: ' || st81_html(nullif(new.n_aziende, '')), '') || '</p>'
+      || coalesce('<p style="background:#f8f4ee;padding:10px 12px;border-radius:8px;white-space:pre-line;">' || st81_html(nullif(new.messaggio, '')) || '</p>', '')
+      || '<p style="font-size:12px;color:#6a5a4b;">Rispondi direttamente a questa persona, oppure trova la richiesta in SafeTrack 81 → Clienti e abbonati.</p></div></div>';
+    for dest in select u.email from public.profili p join auth.users u on u.id = p.user_id where p.admin and u.email is not null loop
+      perform public.st81_invia_email(dest.email, 'Nuova richiesta dal sito: ' || new.nome || coalesce(' (' || nullif(new.azienda, '') || ')', ''), html);
+    end loop;
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_nuova_richiesta on public.richieste_contatto;
+create trigger trg_nuova_richiesta before insert on public.richieste_contatto for each row execute function public.st81_nuova_richiesta();
+
+create or replace function public.admin_richieste()
+returns setof public.richieste_contatto
+language plpgsql security definer stable set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Solo l''amministratore'; end if;
+  return query select * from public.richieste_contatto order by gestita, creata_il desc limit 300;
+end $$;
+
+create or replace function public.admin_richiesta_gestita(rid bigint, valore boolean)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Solo l''amministratore'; end if;
+  update public.richieste_contatto set gestita = valore where id = rid;
+end $$;
+
+revoke all on function public.st81_nuova_richiesta() from public, anon, authenticated;
+revoke all on function public.admin_richieste() from public, anon;
+revoke all on function public.admin_richiesta_gestita(bigint, boolean) from public, anon;
+grant execute on function public.admin_richieste() to authenticated;
+grant execute on function public.admin_richiesta_gestita(bigint, boolean) to authenticated;
+
+-- =====================================================================
 -- ULTIMO PASSO: dopo esserti registrato dall'app, rendi amministratore il tuo account.
 -- Sostituisci l'email e riesegui SOLO questa riga:
 -- update public.profili set admin = true where email = 'la-tua-email@esempio.it';

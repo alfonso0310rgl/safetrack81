@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeTrack 81 — Il gestionale delle scadenze per la sicurezza sul lavoro</title>
+<meta name="description" content="DVR, nomine, formazione e idoneità mediche di tutte le tue aziende in un'unica schermata. Avvisi automatici via email a 30 giorni, a 7 giorni e alla scadenza.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="../config.js"></script>
+<style>
+  :root{
+    --caffe:#2e231b; --caffe2:#3d2f24; --terra:#b8571d; --terra2:#96440f; --crema:#f8f4ee; --sabbia:#efe7db;
+    --testo:#2b2119; --testo2:#65574a; --testo3:#9c8b7a; --bordo:rgba(74,52,32,.12);
+    --rosso:#dc2626; --rosso-soft:#fee2e2; --giallo:#eab308; --giallo-soft:#fef9c3; --giallo-txt:#854d0e; --verde:#4f7a3a; --verde-soft:#e9f1e3;
+    --disp:'Bricolage Grotesque','Inter',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+  body{font-family:var(--body);color:var(--testo);background:var(--crema);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  :focus-visible{outline:3px solid #f0a46c;outline-offset:2px;border-radius:6px}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+  h1,h2,h3{font-family:var(--disp);letter-spacing:-.02em;line-height:1.08}
+  h2{font-size:clamp(30px,4vw,44px);font-weight:800;max-width:20ch}
+  .lead{font-size:18px;color:var(--testo2);max-width:60ch;margin-top:14px}
+  section{padding:96px 0}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 22px;border-radius:12px;font-weight:700;font-size:15px;text-decoration:none;border:none;cursor:pointer;transition:background .15s,transform .15s,box-shadow .15s;font-family:var(--body)}
+  .btn-p{background:var(--terra);color:#fff;box-shadow:0 6px 20px rgba(184,87,29,.28)}
+  .btn-p:hover{background:var(--terra2);transform:translateY(-1px)}
+  .btn-g{background:transparent;color:var(--testo);box-shadow:inset 0 0 0 1.5px var(--bordo)}
+  .btn-g:hover{box-shadow:inset 0 0 0 1.5px var(--testo3)}
+  .btn-l{background:#fff;color:var(--caffe)}
+  .btn-l:hover{background:var(--sabbia)}
+
+  /* NAV */
+  .nav{position:sticky;top:0;z-index:50;background:rgba(248,244,238,.88);backdrop-filter:blur(10px);border-bottom:1px solid transparent;transition:border-color .2s}
+  .nav.scrolled{border-bottom-color:var(--bordo)}
+  .nav-in{display:flex;align-items:center;gap:28px;height:72px}
+  .logo{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:var(--disp);font-weight:800;font-size:20px;letter-spacing:-.02em}
+  .logo-m{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#c8662a,#8f3f12);display:grid;place-items:center;font-size:17px}
+  .nav-links{display:flex;gap:24px;margin-left:auto}
+  .nav-links a{text-decoration:none;font-size:14px;font-weight:600;color:var(--testo2)}
+  .nav-links a:hover{color:var(--testo)}
+  .nav .btn{padding:10px 16px;font-size:14px}
+  .cta-s{display:none}
+  section{scroll-margin-top:72px}
+  .logo{white-space:nowrap}
+  .nav-acc{font-size:14px;font-weight:600;color:var(--testo2);text-decoration:none}
+
+  /* HERO */
+  .hero{padding:64px 0 88px;overflow:hidden}
+  .hero-g{display:grid;grid-template-columns:1.02fr 1fr;gap:56px;align-items:center}
+  .hero h1{font-size:clamp(40px,6vw,72px);font-weight:800;letter-spacing:-.035em;line-height:1}
+  .hero h1 .barrato{position:relative;white-space:nowrap}
+  .hero h1 .barrato::after{content:'';position:absolute;left:-2%;right:-2%;top:54%;height:.12em;background:var(--rosso);border-radius:4px;transform:scaleX(0);transform-origin:left;animation:barra .7s .9s cubic-bezier(.6,.1,.2,1) forwards}
+  @keyframes barra{to{transform:scaleX(1)}}
+  .hero p.lead{font-size:19px;margin-top:22px}
+  .hero-cta{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
+  .hero-note{margin-top:18px;font-size:13px;color:var(--testo3)}
+  /* finto gestionale nell'hero */
+  .mock{background:var(--caffe);border-radius:20px;padding:14px;box-shadow:0 40px 80px -20px rgba(46,35,27,.45),0 0 0 1px rgba(46,35,27,.05);transform:rotate(1.2deg)}
+  .mock-top{display:flex;align-items:center;gap:8px;padding:2px 6px 12px}
+  .mock-top i{width:10px;height:10px;border-radius:50%;background:rgba(255,240,220,.18);display:block}
+  .mock-top span{margin-left:8px;font-size:12px;color:#c9b8a3;font-weight:600}
+  .mock-body{background:var(--crema);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+  .m-az{background:#fff;border-radius:11px;overflow:hidden;display:flex;box-shadow:0 1px 0 var(--bordo)}
+  .m-bar{width:5px}
+  .m-in{flex:1;padding:11px 14px}
+  .m-n{font-weight:700;font-size:14px;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+  .m-r{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;color:var(--testo2)}
+  .m-r b{font-weight:600;color:var(--testo);flex:1}
+  .pill{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:7px;white-space:nowrap}
+  .pill.r{background:var(--rosso);color:#fff}
+  .pill.y{background:var(--giallo-soft);color:var(--giallo-txt);box-shadow:inset 0 0 0 1px #fde047}
+  .pill.g{background:var(--verde-soft);color:var(--verde)}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .m-mail{background:#fff;border-radius:11px;padding:12px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 1px 0 var(--bordo);font-size:13px}
+  .m-mail .ic{width:34px;height:34px;border-radius:9px;background:#fdf0e5;display:grid;place-items:center;font-size:16px;flex-shrink:0}
+  .m-mail small{display:block;color:var(--testo3);font-size:12px}
+
+  /* SCADENZE TIPICHE */
+  .nastro{background:var(--caffe);color:#f3e7d8;padding:72px 0}
+  .nastro h2{color:#fff}
+  .nastro .lead{color:#cbb9a4}
+  .periodi{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,240,220,.1);border-radius:16px;overflow:hidden;margin-top:40px}
+  .per{background:var(--caffe);padding:26px 22px}
+  .per-v{font-family:var(--disp);font-size:40px;font-weight:800;color:#fff;line-height:1}
+  .per-v small{font-size:16px;font-weight:600;color:#cbb9a4;margin-left:4px}
+  .per-t{font-size:14px;color:#e2d2bf;margin-top:10px;line-height:1.45}
+  .per-f{font-size:12px;color:#9e8b76;margin-top:6px}
+  .nastro-chiusa{margin-top:28px;font-size:17px;color:#e2d2bf;max-width:62ch}
+
+  /* PASSI */
+  .passi{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:48px;counter-reset:p}
+  .passo{position:relative;padding-top:64px}
+  .passo::before{counter-increment:p;content:counter(p);position:absolute;top:0;left:0;width:46px;height:46px;border-radius:50%;background:var(--terra);color:#fff;font-family:var(--disp);font-weight:800;font-size:20px;display:grid;place-items:center}
+  .passo:not(:last-child)::after{content:'';position:absolute;top:23px;left:58px;right:-16px;height:2px;background:repeating-linear-gradient(90deg,var(--terra) 0 6px,transparent 6px 12px);opacity:.35}
+  .passo h3{font-size:22px;font-weight:700}
+  .passo p{color:var(--testo2);margin-top:8px;font-size:15.5px}
+
+  /* DEMO */
+  .demo{background:var(--sabbia)}
+  .demo-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+  .app{margin-top:36px;background:var(--caffe);border-radius:20px;padding:12px;box-shadow:0 30px 60px -24px rgba(46,35,27,.45)}
+  .app-in{display:grid;grid-template-columns:230px 1fr;background:var(--crema);border-radius:12px;overflow:hidden;min-height:470px}
+  .app-side{background:var(--caffe);padding:14px 10px;display:flex;flex-direction:column;gap:3px;border-right:1px solid rgba(255,240,220,.06)}
+  .app-side h4{font-family:var(--body);font-size:11px;color:#9e8b76;font-weight:700;padding:4px 10px 8px;letter-spacing:.02em}
+  .s-it{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;color:#eadfce;font-size:13px;cursor:pointer;border:none;background:none;text-align:left;font-family:var(--body);width:100%}
+  .s-it:hover{background:rgba(255,240,220,.06)}
+  .s-it.on{background:rgba(232,140,80,.22);color:#fff;box-shadow:inset 3px 0 0 #e8925a}
+  .app-main{padding:22px 24px;overflow:auto}
+  .kp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .kp div{background:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 1px 0 var(--bordo)}
+  .kp b{font-family:var(--disp);font-size:26px;font-weight:800;display:block;line-height:1.1}
+  .kp span{font-size:12px;color:var(--testo3)}
+  .d-az{background:#fff;border-radius:12px;overflow:hidden;display:flex;margin-bottom:10px;box-shadow:0 1px 0 var(--bordo)}
+  .d-az .m-in{padding:0}
+  .d-h{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--bordo);gap:10px}
+  .d-h strong{font-size:14.5px}
+  .d-r{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--bordo);font-size:13px}
+  .d-r:last-child{border-bottom:none}
+  .d-r .t{flex:1;font-weight:600}
+  .d-r .t em{font-style:normal;font-weight:500;color:var(--testo2)}
+  .d-r .dt{color:var(--testo3);font-size:12px}
+  .rinnova{font-size:12px;font-weight:700;padding:5px 10px;border-radius:8px;border:1.5px solid var(--bordo);background:#fff;cursor:pointer;color:var(--testo);font-family:var(--body)}
+  .rinnova:hover{border-color:var(--terra);color:var(--terra)}
+  .d-tools{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+  .d-tools .btn{padding:9px 14px;font-size:13px}
+  .ok-box{background:#fff;border-radius:12px;padding:36px;text-align:center;box-shadow:0 1px 0 var(--bordo)}
+  .ok-box b{display:block;font-family:var(--disp);font-size:22px;margin-top:10px}
+  .flash{animation:flash .9s ease}
+  @keyframes flash{0%{background:#eaf5e2}100%{background:#fff}}
+  .demo-hint{margin-top:16px;font-size:14px;color:var(--testo2)}
+  .mail-prev{background:#fff;border-radius:12px;padding:20px 22px;box-shadow:0 1px 0 var(--bordo);font-size:13.5px;line-height:1.65}
+  .mail-prev .mh{display:grid;grid-template-columns:70px 1fr;gap:4px 10px;font-size:12.5px;color:var(--testo2);padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--bordo)}
+  .mail-prev .mh b{color:var(--testo3);font-weight:600}
+  .mail-prev p{margin-bottom:10px}
+
+  /* VANTAGGI */
+  .vant{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-top:48px}
+  .v-it{display:grid;grid-template-columns:44px 1fr;gap:16px;padding:22px 0;border-top:1px solid var(--bordo)}
+  .v-ic{width:44px;height:44px;border-radius:12px;background:#fdf0e5;display:grid;place-items:center;font-size:20px}
+  .v-it h3{font-family:var(--body);font-size:17px;font-weight:700;letter-spacing:0;line-height:1.3}
+  .v-it p{color:var(--testo2);font-size:15px;margin-top:4px}
+
+  /* PER CHI */
+  .chi{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+  .chi-it{background:#fff;border-radius:16px;padding:26px;border:1px solid var(--bordo)}
+  .chi-it h3{font-size:21px;font-weight:700}
+  .chi-it p{color:var(--testo2);font-size:15px;margin-top:8px}
+
+  /* ABBONAMENTO */
+  .abb{background:var(--caffe);color:#f3e7d8}
+  .abb h2{color:#fff}
+  .abb .lead{color:#cbb9a4}
+  .piani{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:40px;max-width:880px}
+  .piano{border-radius:18px;padding:30px;background:var(--caffe2);border:1px solid rgba(255,240,220,.1)}
+  .piano.top{background:linear-gradient(160deg,#c8662a,#8f3f12);border:none}
+  .piano h3{font-size:26px;color:#fff}
+  .piano .sub{color:#e2d2bf;font-size:15px;margin-top:6px}
+  .piano ul{list-style:none;margin:20px 0 26px;display:flex;flex-direction:column;gap:9px}
+  .piano li{font-size:15px;color:#f3e7d8;padding-left:26px;position:relative}
+  .piano li::before{content:'✓';position:absolute;left:0;color:#f6c49b;font-weight:800}
+  .piano.top li::before{color:#fff}
+  .tag{display:inline-block;font-size:12px;font-weight:700;background:rgba(255,255,255,.18);color:#fff;padding:4px 10px;border-radius:20px;margin-bottom:14px}
+
+  /* FAQ */
+  .faq{max-width:780px;margin-top:36px}
+  details{border-top:1px solid var(--bordo);padding:18px 0}
+  details:last-child{border-bottom:1px solid var(--bordo)}
+  summary{cursor:pointer;font-weight:700;font-size:17px;list-style:none;display:flex;justify-content:space-between;gap:16px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:'+';font-size:22px;line-height:1;color:var(--terra);transition:transform .2s}
+  details[open] summary::after{transform:rotate(45deg)}
+  details p{color:var(--testo2);margin-top:10px;font-size:15.5px;max-width:68ch}
+
+  /* CONTATTI */
+  .cont-g{display:grid;grid-template-columns:.9fr 1.1fr;gap:56px;align-items:start}
+  .canali{display:flex;flex-direction:column;gap:12px;margin-top:28px}
+  .canale{display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--bordo);border-radius:14px;padding:14px 16px;text-decoration:none}
+  .canale:hover{border-color:var(--terra)}
+  .canale .v-ic{flex-shrink:0}
+  .canale b{display:block;font-size:15px}
+  .canale span{font-size:13.5px;color:var(--testo2)}
+  form.cf{background:#fff;border-radius:20px;padding:30px;border:1px solid var(--bordo);box-shadow:0 20px 50px -30px rgba(46,35,27,.35)}
+  .fr{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .fld{margin-bottom:14px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--testo2);margin-bottom:6px}
+  input,select,textarea{width:100%;font:inherit;font-size:15px;padding:12px 14px;border-radius:11px;border:1.5px solid var(--bordo);background:var(--crema);color:var(--testo)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--terra);background:#fff;box-shadow:0 0 0 4px rgba(184,87,29,.12)}
+  textarea{resize:vertical;min-height:110px}
+  .chk{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--testo2);font-weight:400;margin:4px 0 18px}
+  .chk input{width:auto;margin-top:4px}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+  .f-msg{font-size:14px;margin-bottom:12px;min-height:20px}
+  .f-ok{text-align:center;padding:30px 10px}
+  .f-ok .v-ic{margin:0 auto 14px;width:60px;height:60px;font-size:28px;background:var(--verde-soft)}
+
+  footer{background:var(--caffe);color:#bba78f;padding:44px 0;font-size:14px}
+  .foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+  footer a{color:#e2d2bf}
+
+  @media (max-width:960px){
+    .hero-g,.cont-g,.vant{grid-template-columns:1fr}
+    .mock{transform:none}
+    .periodi{grid-template-columns:1fr 1fr}
+    .passi,.chi{grid-template-columns:1fr}
+    .passo:not(:last-child)::after{display:none}
+    .piani{grid-template-columns:1fr}
+    .app-in{grid-template-columns:1fr}
+    .app-side{flex-direction:row;overflow:auto}
+    .app-side h4{display:none}
+    .s-it{white-space:nowrap;width:auto}
+    .nav-links{display:none}
+    section{padding:72px 0}
+  }
+  @media (max-width:560px){ .cta-l{display:none} .cta-s{display:inline} .nav-in{gap:14px} .nav-acc{margin-left:auto} .fr,.kp{grid-template-columns:1fr} .periodi{grid-template-columns:1fr} .d-r{flex-wrap:wrap} }
+</style>
+</head>
+<body>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="logo" href="#top"><span class="logo-m">🛡️</span>SafeTrack 81</a>
+    <nav class="nav-links" aria-label="Sezioni">
+      <a href="#come-funziona">Come funziona</a>
+      <a href="#demo">Demo</a>
+      <a href="#vantaggi">Vantaggi</a>
+      <a href="#abbonamento">Abbonamento</a>
+      <a href="#domande">Domande</a>
+    </nav>
+    <a class="nav-acc" href="../">Accedi</a>
+    <a class="btn btn-p" href="#contatti"><span class="cta-l">Richiedi informazioni</span><span class="cta-s">Contattaci</span></a>
+  </div>
+</header>
+
+<main id="top">
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap hero-g">
+    <div>
+      <h1>La scadenza <span class="barrato">dimenticata</span> non è più un rischio.</h1>
+      <p class="lead">SafeTrack 81 raccoglie DVR, nomine, formazione e idoneità mediche di tutte le tue aziende e ti avvisa prima che scadano. Avvisa anche le aziende, in automatico, con la tua firma.</p>
+      <div class="hero-cta">
+        <a class="btn btn-p" href="#demo">Prova la demo</a>
+        <a class="btn btn-g" href="#contatti">Parla con noi</a>
+      </div>
+      <p class="hero-note">Funziona dal browser, su qualsiasi computer. Nessuna installazione.</p>
+    </div>
+    <div class="mock" aria-hidden="true">
+      <div class="mock-top"><i></i><i></i><i></i><span>Scadenze di oggi</span></div>
+      <div class="mock-body">
+        <div class="m-az"><div class="m-bar" style="background:var(--rosso)"></div><div class="m-in">
+          <div class="m-n">Edil Sud S.r.l.<span class="pill r">2 scadute</span></div>
+          <div class="m-r"><span class="dot" style="background:var(--rosso)"></span><b>Aggiornamento antincendio · L. Russo</b><span class="pill r">da 12 giorni</span></div>
+          <div class="m-r"><span class="dot" style="background:var(--rosso)"></span><b>Idoneità sanitaria · M. Esposito</b><span class="pill r">da 3 giorni</span></div>
+        </div></div>
+        <div class="m-az"><div class="m-bar" style="background:var(--giallo)"></div><div class="m-in">
+          <div class="m-n">Panificio Bianchi<span class="pill y">1 in scadenza</span></div>
+          <div class="m-r"><span class="dot" style="background:var(--giallo)"></span><b>Primo soccorso · A. Bianchi</b><span class="pill y">tra 9 giorni</span></div>
+        </div></div>
+        <div class="m-az"><div class="m-bar" style="background:var(--giallo)"></div><div class="m-in">
+          <div class="m-n">Hotel Costiera<span class="pill y">1 in scadenza</span></div>
+          <div class="m-r"><span class="dot" style="background:var(--giallo)"></span><b>Aggiornamento RLS</b><span class="pill y">tra 24 giorni</span></div>
+        </div></div>
+        <div class="m-mail"><span class="ic">📧</span><div><b>Riepilogo inviato a Panificio Bianchi</b><small>Stamattina alle 7:05, con la firma del tuo studio</small></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PERIODICITÀ -->
+<section class="nastro">
+  <div class="wrap">
+    <h2>Ogni lavoratore porta con sé un calendario di scadenze.</h2>
+    <p class="lead">Moltiplicalo per i dipendenti e per le aziende che segui: sono centinaia di date. Basta perderne una per lasciare un'azienda scoperta.</p>
+    <div class="periodi">
+      <div class="per"><div class="per-v">5<small>anni</small></div><div class="per-t">Aggiornamento della formazione dei lavoratori</div><div class="per-f">Accordo Stato-Regioni</div></div>
+      <div class="per"><div class="per-v">3<small>anni</small></div><div class="per-t">Aggiornamento degli addetti al primo soccorso</div><div class="per-f">D.M. 388/2003</div></div>
+      <div class="per"><div class="per-v">5<small>anni</small></div><div class="per-t">Aggiornamento degli addetti antincendio</div><div class="per-f">D.M. 2 settembre 2021</div></div>
+      <div class="per"><div class="per-v">1<small>anno</small></div><div class="per-t">Aggiornamento del rappresentante dei lavoratori (RLS)</div><div class="per-f">D.Lgs. 81/08, art. 37</div></div>
+    </div>
+    <p class="nastro-chiusa">A queste si aggiungono la revisione del DVR, le nomine e le visite mediche periodiche. SafeTrack 81 le calcola tutte per te.</p>
+  </div>
+</section>
+
+<!-- COME FUNZIONA -->
+<section id="come-funziona">
+  <div class="wrap">
+    <h2>Tre passaggi, poi ci pensa il gestionale.</h2>
+    <div class="passi">
+      <div class="passo"><h3>Inserisci aziende e lavoratori</h3><p>Aggiungi le aziende che segui, i dipendenti, i corsi svolti e le nomine. Se hai già un archivio, lo importiamo noi.</p></div>
+      <div class="passo"><h3>Le scadenze si calcolano da sole</h3><p>Da ogni data inserita il gestionale ricava la prossima scadenza, in base alla periodicità del corso o del documento.</p></div>
+      <div class="passo"><h3>Ricevi gli avvisi in tempo</h3><p>Ogni mattina ti arriva un'email con ciò che scade a 30 giorni, a 7 giorni e oggi. Se vuoi, avvisa direttamente anche l'azienda.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO -->
+<section class="demo" id="demo">
+  <div class="wrap">
+    <div class="demo-head">
+      <div>
+        <h2>Provalo adesso, senza registrarti.</h2>
+        <p class="lead">Questa è una versione semplificata del gestionale con tre aziende di esempio. Rinnova una scadenza e guarda cosa succede, oppure prepara l'email per un'azienda.</p>
+      </div>
+      <button class="btn btn-g" type="button" onclick="demoReset()">Ricomincia la demo</button>
+    </div>
+    <div class="app">
+      <div class="app-in">
+        <div class="app-side" id="dSide"></div>
+        <div class="app-main" id="dMain" aria-live="polite"></div>
+      </div>
+    </div>
+    <p class="demo-hint" id="dHint">Suggerimento: premi <strong>Rinnova</strong> accanto a una scadenza rossa.</p>
+  </div>
+</section>
+
+<!-- VANTAGGI -->
+<section id="vantaggi">
+  <div class="wrap">
+    <h2>Cosa cambia nel tuo lavoro.</h2>
+    <div class="vant">
+      <div>
+        <div class="v-it"><span class="v-ic">⏱️</span><div><h3>Ore risparmiate ogni settimana</h3><p>Niente più fogli Excel da scorrere a mano. Apri il gestionale e vedi subito, in ordine di urgenza, quali aziende hanno qualcosa da sistemare.</p></div></div>
+        <div class="v-it"><span class="v-ic">🔔</span><div><h3>Avvisi che arrivano da soli</h3><p>Email automatiche a 30 giorni, a 7 giorni e alla scadenza. Ogni scadenza viene segnalata senza ripetizioni inutili.</p></div></div>
+        <div class="v-it"><span class="v-ic">📨</span><div><h3>Le aziende avvisate con la tua firma</h3><p>Il riepilogo parte verso l'azienda con il nome e i contatti del tuo studio. Le risposte arrivano a te.</p></div></div>
+      </div>
+      <div>
+        <div class="v-it"><span class="v-ic">👥</span><div><h3>Tutto lo studio sugli stessi dati</h3><p>Colleghi su computer diversi vedono le modifiche in tempo reale. Nessun file da passarsi, nessuna versione vecchia.</p></div></div>
+        <div class="v-it"><span class="v-ic">📄</span><div><h3>Documenti pronti in un clic</h3><p>Scarica il riepilogo delle scadenze di un'azienda in Word, già impaginato e intestato al tuo studio.</p></div></div>
+        <div class="v-it"><span class="v-ic">🔒</span><div><h3>Dati al sicuro, in Europa</h3><p>Accesso con email e password, ogni account vede solo il proprio gestionale. Copia di sicurezza automatica ogni giorno, conservata 30 giorni.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PER CHI -->
+<section style="padding-top:0">
+  <div class="wrap">
+    <h2>Pensato per chi segue la sicurezza di più aziende.</h2>
+    <div class="chi">
+      <div class="chi-it"><h3>Studi di consulenza</h3><p>Gestisci decine di clienti da un'unica schermata e lavora insieme ai colleghi sugli stessi dati.</p></div>
+      <div class="chi-it"><h3>RSPP esterni</h3><p>Tieni sotto controllo formazione, nomine e sorveglianza sanitaria di ogni azienda in cui hai l'incarico.</p></div>
+      <div class="chi-it"><h3>Aziende con più sedi</h3><p>Un solo posto per le scadenze di tutti i lavoratori, con gli avvisi a chi deve occuparsene.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ABBONAMENTO -->
+<section class="abb" id="abbonamento">
+  <div class="wrap">
+    <h2>Un abbonamento semplice, senza sorprese.</h2>
+    <p class="lead">Il prezzo dipende da quante aziende gestisci. Scrivici e ricevi una proposta su misura: l'accesso si attiva appena confermato.</p>
+    <div class="piani">
+      <div class="piano">
+        <h3>Mensile</h3>
+        <p class="sub">Per iniziare senza impegno e disdire quando vuoi.</p>
+        <ul><li>Tutte le funzioni del gestionale</li><li>Avvisi email automatici</li><li>Invio automatico alle aziende con la tua firma</li><li>Colleghi sullo stesso gestionale</li></ul>
+        <a class="btn btn-l" href="#contatti" onclick="scegliPiano('Mensile')">Richiedi il piano mensile</a>
+      </div>
+      <div class="piano top">
+        <span class="tag">Il più conveniente</span>
+        <h3>Annuale</h3>
+        <p class="sub">Un pagamento all'anno a un prezzo più basso del mensile.</p>
+        <ul><li>Tutto quello del piano mensile</li><li>Prezzo più basso rispetto al mensile</li><li>Un solo pagamento all'anno</li><li>Nessun rinnovo da ricordare ogni mese</li></ul>
+        <a class="btn btn-l" href="#contatti" onclick="scegliPiano('Annuale')">Richiedi il piano annuale</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DOMANDE -->
+<section id="domande">
+  <div class="wrap">
+    <h2>Domande frequenti.</h2>
+    <div class="faq">
+      <details><summary>Devo installare qualcosa?</summary><p>No. SafeTrack 81 si usa dal browser, da qualsiasi computer, con la tua email e password. Le modifiche sono salvate online e visibili subito anche ai colleghi.</p></details>
+      <details><summary>Posso portare dentro i dati che ho già?</summary><p>Sì. Se hai un archivio in Excel o in un altro gestionale, contattaci: ti aiutiamo a importarlo, così inizi a lavorare dal primo giorno.</p></details>
+      <details><summary>Chi riceve gli avvisi delle scadenze?</summary><p>Ogni utente riceve ogni mattina un'email con le scadenze a 30 giorni, a 7 giorni e quelle scadute. Se lo attivi, anche ogni azienda riceve il suo riepilogo, firmato con i dati del tuo studio.</p></details>
+      <details><summary>I miei dati sono al sicuro?</summary><p>I dati sono conservati su server in Europa e ogni account vede solo il proprio gestionale. Ogni giorno viene salvata una copia di sicurezza, conservata per 30 giorni.</p></details>
+      <details><summary>Come si attiva l'abbonamento?</summary><p>Compila il modulo qui sotto o scrivici. Ti mandiamo la proposta, crei il tuo account e attiviamo l'accesso per la durata scelta. Alla scadenza ti avvisiamo per il rinnovo, e i tuoi dati restano conservati.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- CONTATTI -->
+<section id="contatti" style="padding-top:24px">
+  <div class="wrap cont-g">
+    <div>
+      <h2>Parliamone.</h2>
+      <p class="lead">Raccontaci quante aziende segui e come lavori oggi. Ti rispondiamo entro un giorno lavorativo con una proposta e, se vuoi, una dimostrazione dal vivo.</p>
+      <div class="canali" id="canali"></div>
+    </div>
+    <form class="cf" id="cf" onsubmit="inviaRichiesta(event)" novalidate>
+      <div id="cfCampi">
+        <div class="fr">
+          <div class="fld"><label for="c_nome">Nome e cognome</label><input id="c_nome" autocomplete="name" required></div>
+          <div class="fld"><label for="c_az">Studio o azienda</label><input id="c_az" autocomplete="organization"></div>
+        </div>
+        <div class="fr">
+          <div class="fld"><label for="c_email">Email</label><input id="c_email" type="email" autocomplete="email" required></div>
+          <div class="fld"><label for="c_tel">Telefono</label><input id="c_tel" type="tel" autocomplete="tel"></div>
+        </div>
+        <div class="fld"><label for="c_n">Quante aziende gestisci?</label>
+          <select id="c_n"><option value="">Seleziona</option><option>1–10</option><option>11–30</option><option>31–80</option><option>Più di 80</option></select></div>
+        <div class="fld"><label for="c_msg">Messaggio</label><textarea id="c_msg" placeholder="Ad esempio: seguo 40 aziende nel settore alimentare e oggi uso Excel."></textarea></div>
+        <div class="hp" aria-hidden="true"><label for="c_web">Lascia vuoto</label><input id="c_web" tabindex="-1" autocomplete="off"></div>
+        <label class="chk"><input type="checkbox" id="c_priv"><span>Acconsento al trattamento dei dati per essere ricontattato in merito a SafeTrack 81.</span></label>
+        <div class="f-msg" id="cfMsg" role="status"></div>
+        <button class="btn btn-p" id="cfBtn" type="submit" style="width:100%">Invia la richiesta</button>
+      </div>
+    </form>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div style="display:flex;align-items:center;gap:10px;"><span class="logo-m" style="width:30px;height:30px;font-size:14px;">🛡️</span><strong style="color:#fff;font-family:var(--disp);font-size:17px;">SafeTrack 81</strong></div>
+    <div>Gestionale delle scadenze per la sicurezza sul lavoro, D.Lgs. 81/08</div>
+    <div><a href="../">Accedi al gestionale</a></div>
+  </div>
+</footer>
+
+<script>
+const CFG = window.SAFETRACK_CONFIG || {};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---------- barra di navigazione ----------
+addEventListener('scroll', () => document.getElementById('nav').classList.toggle('scrolled', scrollY > 10), {passive:true});
+
+// ---------- contatti diretti ----------
+(function(){
+  const c = [];
+  if (CFG.CONTATTO_EMAIL) c.push(`<a class="canale" href="mailto:${esc(CFG.CONTATTO_EMAIL)}"><span class="v-ic">📧</span><div><b>Scrivici</b><span>${esc(CFG.CONTATTO_EMAIL)}</span></div></a>`);
+  const wa = String(CFG.CONTATTO_WHATSAPP || '').replace(/\D/g, '');
+  if (wa) c.push(`<a class="canale" href="https://wa.me/${wa.startsWith('39') ? wa : '39' + wa}" target="_blank" rel="noopener"><span class="v-ic">💬</span><div><b>WhatsApp</b><span>${esc(CFG.CONTATTO_WHATSAPP)}</span></div></a>`);
+  if (CFG.CONTATTO_TELEFONO) c.push(`<a class="canale" href="tel:${esc(String(CFG.CONTATTO_TELEFONO).replace(/\s/g,''))}"><span class="v-ic">📞</span><div><b>Chiamaci</b><span>${esc(CFG.CONTATTO_TELEFONO)}</span></div></a>`);
+  document.getElementById('canali').innerHTML = c.join('');
+})();
+
+function scegliPiano(p){
+  const m = document.getElementById('c_msg');
+  if (!m.value.trim()) m.value = `Sono interessato al piano ${p}.`;
+}
+
+// ---------- modulo di contatto ----------
+async function inviaRichiesta(ev){
+  ev.preventDefault();
+  const g = id => document.getElementById(id).value.trim();
+  const msg = document.getElementById('cfMsg');
+  const err = t => { msg.textContent = t; msg.style.color = 'var(--rosso)'; };
+  if (g('c_web')) return; // spam
+  const d = {nome:g('c_nome'), azienda:g('c_az'), email:g('c_email'), telefono:g('c_tel'), n_aziende:g('c_n'), messaggio:g('c_msg')};
+  if (!d.nome) return err('Scrivi il tuo nome.');
+  if (!/^\S+@\S+\.\S+$/.test(d.email)) return err('Scrivi un indirizzo email valido, così possiamo risponderti.');
+  if (!document.getElementById('c_priv').checked) return err('Per inviare la richiesta serve il consenso al trattamento dei dati.');
+  if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) return err('Modulo non configurato: scrivici direttamente via email.');
+  const b = document.getElementById('cfBtn'); b.disabled = true; b.textContent = 'Invio in corso…';
+  try {
+    const r = await fetch(CFG.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/richieste_contatto', {
+      method:'POST',
+      headers:{'apikey':CFG.SUPABASE_ANON_KEY,'Authorization':'Bearer ' + CFG.SUPABASE_ANON_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(d)
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(/Troppe richieste/.test(t) ? 'Hai già inviato diverse richieste: ti risponderemo a breve.' : 'Invio non riuscito. Riprova tra poco oppure scrivici via email.');
+    }
+    document.getElementById('cfCampi').innerHTML = `<div class="f-ok"><div class="v-ic">✓</div><h3 style="font-size:24px;">Richiesta inviata</h3><p style="color:var(--testo2);margin-top:8px;">Grazie ${esc(d.nome.split(' ')[0])}, ti rispondiamo a <strong>${esc(d.email)}</strong> entro un giorno lavorativo.</p></div>`;
+  } catch (e) {
+    err(e.message || 'Invio non riuscito. Controlla la connessione e riprova.');
+    b.disabled = false; b.textContent = 'Invia la richiesta';
+  }
+}
+
+// ---------- DEMO ----------
+const OGGI = new Date(); OGGI.setHours(0,0,0,0);
+const piu = n => { const d = new Date(OGGI); d.setDate(d.getDate() + n); return d; };
+const fd = d => d.toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric'});
+const gg = d => Math.round((d - OGGI) / 86400000);
+let D, vista, sel;
+function demoDati(){
+  return [
+    {id:'a', nome:'Edil Sud S.r.l.', email:'info@edilsud.it', voci:[
+      {l:'Aggiornamento antincendio', p:'Luca Russo', d:piu(-12), anni:5},
+      {l:'Idoneità sanitaria', p:'Marco Esposito', d:piu(-3), anni:1},
+      {l:'Formazione specifica lavoratori', p:'Gennaro Santoro', d:piu(18), anni:5},
+      {l:'Revisione DVR', p:'', d:piu(210), anni:0}]},
+    {id:'b', nome:'Panificio Bianchi', email:'amministrazione@panificiobianchi.it', voci:[
+      {l:'Primo soccorso', p:'Anna Bianchi', d:piu(9), anni:3},
+      {l:'Formazione generale lavoratori', p:'Paolo Greco', d:piu(400), anni:5}]},
+    {id:'c', nome:'Hotel Costiera', email:'direzione@hotelcostiera.it', voci:[
+      {l:'Aggiornamento RLS', p:'Sara De Luca', d:piu(24), anni:1},
+      {l:'Nomina medico competente', p:'', d:piu(320), anni:0}]},
+  ];
+}
+function demoReset(){ D = demoDati(); vista = 'home'; sel = null; demoRender(); suggerisci('Suggerimento: premi <strong>Rinnova</strong> accanto a una scadenza rossa.'); }
+function suggerisci(t){ document.getElementById('dHint').innerHTML = t; }
+function aperte(a){ return a.voci.filter(v => gg(v.d) <= 30).sort((x,y) => x.d - y.d); }
+function pill(n){ return n < 0 ? `<span class="pill r">Scaduta da ${-n} ${n===-1?'giorno':'giorni'}</span>` : `<span class="pill y">${n===0?'Scade oggi':'Tra '+n+' giorni'}</span>`; }
+function demoRender(){
+  const side = document.getElementById('dSide');
+  side.innerHTML = `<h4>Aziende</h4>` + [`<button class="s-it ${vista==='home'?'on':''}" onclick="demoVai('home')">📋 Tutte le scadenze</button>`]
+    .concat(D.map(a => { const o = aperte(a); const c = o.some(v=>gg(v.d)<0)?'var(--rosso)':o.length?'var(--giallo)':'#8db36f';
+      return `<button class="s-it ${sel===a.id&&vista!=='home'?'on':''}" onclick="demoVai('${a.id}')"><span class="dot" style="background:${c}"></span>${esc(a.nome)}</button>`; })).join('');
+  const m = document.getElementById('dMain');
+  if (vista === 'home') {
+    let sc = 0, inS = 0; const gr = [];
+    D.forEach(a => { const o = aperte(a); if (!o.length) return; o.forEach(v => gg(v.d) < 0 ? sc++ : inS++); gr.push({a, o}); });
+    gr.sort((x,y) => x.o[0].d - y.o[0].d);
+    m.innerHTML = `<div class="kp"><div><b style="color:var(--rosso)">${sc}</b><span>Scadute</span></div><div><b style="color:#ca8a04">${inS}</b><span>In scadenza entro 30 giorni</span></div><div><b style="color:var(--verde)">${D.length-gr.length} / ${D.length}</b><span>Aziende in regola</span></div></div>`
+      + (gr.length ? gr.map(({a,o}) => { const s = o.some(v=>gg(v.d)<0);
+        return `<div class="d-az"><div class="m-bar" style="background:${s?'var(--rosso)':'var(--giallo)'}"></div><div class="m-in"><div class="d-h"><strong>${esc(a.nome)}</strong><button class="rinnova" onclick="demoVai('${a.id}','mail')">📧 Prepara email</button></div>`
+          + o.map(v => { const i = a.voci.indexOf(v), n = gg(v.d);
+            return `<div class="d-r" id="r-${a.id}-${i}"><span class="dot" style="background:${n<0?'var(--rosso)':'var(--giallo)'}"></span><span class="t">${esc(v.l)}${v.p?` <em>· ${esc(v.p)}</em>`:''}</span><span class="dt">${fd(v.d)}</span>${pill(n)}<button class="rinnova" onclick="demoRinnova('${a.id}',${i})">Rinnova</button></div>`; }).join('')
+          + `</div></div>`; }).join('')
+        : `<div class="ok-box">✅<b>Tutto in regola</b><p style="color:var(--testo2);margin-top:6px;">Nessuna scadenza nei prossimi 30 giorni. Così si presenta il gestionale quando è tutto a posto.</p></div>`);
+  } else {
+    const a = D.find(x => x.id === sel), o = aperte(a);
+    if (vista === 'mail') {
+      const righe = o.map(v => `<p>- <strong>${esc(v.l)}${v.p?' — '+esc(v.p):''}</strong><br><strong>Scadenza: ${fd(v.d)}</strong></p>`).join('');
+      m.innerHTML = `<div class="d-tools"><button class="btn btn-g" onclick="demoVai('${a.id}')">Torna all'azienda</button><span style="font-size:13px;color:var(--testo2);">Questa email può partire in automatico ogni volta che una scadenza entra nei 30 giorni.</span></div>
+        <div class="mail-prev"><div class="mh"><b>A</b><span>${esc(a.email)}</span><b>Da</b><span>Il tuo studio</span><b>Oggetto</b><span>Riepilogo Scadenze D.Lgs. 81/08 — ${esc(a.nome)}</span></div>
+        <p>Gentile <strong>${esc(a.nome)}</strong>,</p><p>di seguito il riepilogo dei documenti in scadenza nel prossimo mese. Ti invitiamo a prendere visione e a contattarci per pianificare il rinnovo.</p>
+        ${righe || '<p><em>Al momento non ci sono scadenze da comunicare.</em></p>'}<p>Per procedere al rinnovo è sufficiente rispondere a questa email.</p><p>Cordiali saluti<br><strong>Il tuo studio</strong></p></div>`;
+      suggerisci('Nel gestionale vero la firma, i contatti e la copia per conoscenza sono quelli del tuo studio.');
+    } else {
+      m.innerHTML = `<div class="d-tools"><strong style="font-size:17px;margin-right:auto;font-family:var(--disp);">${esc(a.nome)}</strong><button class="btn btn-p" onclick="demoVai('${a.id}','mail')">📧 Prepara email per l'azienda</button></div>
+        <div class="d-az"><div class="m-in">` + a.voci.slice().sort((x,y)=>x.d-y.d).map(v => { const i = a.voci.indexOf(v), n = gg(v.d);
+          const stato = n > 30 ? `<span class="pill g">In regola</span>` : pill(n);
+          return `<div class="d-r" id="r-${a.id}-${i}"><span class="dot" style="background:${n<0?'var(--rosso)':n<=30?'var(--giallo)':'#8db36f'}"></span><span class="t">${esc(v.l)}${v.p?` <em>· ${esc(v.p)}</em>`:''}</span><span class="dt">${fd(v.d)}</span>${stato}${n<=30?`<button class="rinnova" onclick="demoRinnova('${a.id}',${i})">Rinnova</button>`:''}</div>`; }).join('') + `</div></div>`;
+    }
+  }
+}
+function demoVai(id, v){ if (id === 'home') { vista = 'home'; sel = null; } else { sel = id; vista = v || 'azienda'; } demoRender(); }
+function demoRinnova(id, i){
+  const a = D.find(x => x.id === id), v = a.voci[i];
+  const anni = v.anni || 1; const nd = new Date(OGGI); nd.setFullYear(nd.getFullYear() + anni); v.d = nd;
+  if (vista === 'home') { vista = 'azienda'; sel = id; }
+  demoRender();
+  const r = document.getElementById(`r-${id}-${i}`); if (r) r.classList.add('flash');
+  const rest = D.reduce((s,x) => s + aperte(x).length, 0);
+  suggerisci(rest ? `Fatto: la nuova scadenza è il <strong>${fd(nd)}</strong> e l'azienda torna in regola per questa voce. Mancano ancora ${rest} scadenze: torna su <strong>Tutte le scadenze</strong>.` : 'Tutte le scadenze sono state rinnovate. <a href="#contatti" style="color:var(--terra);font-weight:700;">Vuoi provarlo con le tue aziende?</a>');
+}
+demoReset();
+</script>
+</body>
+</html>

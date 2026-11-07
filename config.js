@@ -6,7 +6,8 @@ window.SAFETRACK_CONFIG = {
 
   // Contatti mostrati ai clienti in attesa di attivazione o con abbonamento scaduto
   CONTATTO_EMAIL: "info@studioingegnerialuongo.com",
-  CONTATTO_TELEFONO: "",                          // es. "+39 333 1234567"
+  CONTATTO_TELEFONO: "",
+  CONTATTO_WHATSAPP: "0812597443",              // mostrato nel sito di presentazione
 
   // Link all'informativa privacy (facoltativo)
   PRIVACY_URL: ""

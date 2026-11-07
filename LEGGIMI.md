@@ -127,6 +127,12 @@ Ogni mattina verso le 7, quando una scadenza di un'azienda entra nei 30 giorni, 
 - **Attivazione**: dal titolare, in **⚙️ Account → Invio automatico alle aziende**. È spento di default.
 - **Esclusioni**: si può escludere una singola azienda dalla sua scheda **🔔 Scadenze**, interruttore "Per questa azienda". Lì si vede anche la data dell'ultimo invio automatico.
 
+## 11. Sito di presentazione
+Il sito per presentare il gestionale ai potenziali clienti è su `https://alfonso0310rgl.github.io/safetrack81/sito/`. Contiene una demo provabile senza registrazione e un modulo di contatto.
+- Ogni richiesta inviata dal modulo arriva via email agli amministratori.
+- Le richieste compaiono anche in **👥 Clienti e abbonati → Richieste dal sito**, dove puoi segnarle come gestite.
+- Email e WhatsApp mostrati nel sito si cambiano in `config.js` (`CONTATTO_EMAIL`, `CONTATTO_WHATSAPP`, `CONTATTO_TELEFONO`).
+
 ## Da sapere
 - **Backup automatico**: ogni giorno viene salvata una copia nel database (tabella `backup`) e vengono tenuti gli ultimi 30 giorni. Puoi sempre fare anche **📥 Esporta**.
 - **Piano gratuito di Supabase**: il progetto va in pausa se nessuno lo usa per 7 giorni. Si riattiva dalla dashboard con **Restore**. Con l'uso quotidiano non succede.

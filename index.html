@@ -411,6 +411,13 @@
       <div class="card" style="padding:16px 18px;margin-bottom:14px;">
         <div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔗 Link di registrazione per i nuovi clienti</div>
         <div class="linkbox"><code id="linkReg"></code><button class="btn btn-secondary btn-sm" onclick="copiaLinkReg(this)">Copia link</button></div>
+        <div style="font-size:13px;font-weight:700;margin:14px 0 8px;">🌐 Sito di presentazione</div>
+        <div class="linkbox"><code id="linkSito"></code><a class="btn btn-secondary btn-sm" id="apriSito" target="_blank" rel="noopener" style="text-decoration:none;">Apri</a><button class="btn btn-secondary btn-sm" onclick="copiaTesto(document.getElementById('linkSito').textContent,this)">Copia link</button></div>
+      </div>
+      <div class="card" style="padding:16px 18px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:14px;font-weight:700;">📨 Richieste dal sito <span id="richN" class="chip" style="margin-left:6px;"></span></div>
+          <label style="display:flex;align-items:center;gap:6px;margin:0;text-transform:none;letter-spacing:normal;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;"><input type="checkbox" id="richTutte" style="width:auto;" onchange="renderRichieste()">Mostra anche quelle gestite</label></div>
+        <div id="richLista" style="font-size:13px;color:var(--text3);">Caricamento…</div>
       </div>
       <div id="adminFiltri" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
       <div class="card" style="padding:0 6px;overflow:auto;"><div id="adminLista"></div></div>
@@ -1952,12 +1959,15 @@ function statoUtente(u){
 async function aggiornaBadge(){
   const {data}=await sb.rpc('admin_lista_utenti'); if(!data) return;
   ADMIN.utenti=data;
-  const n=data.filter(u=>statoUtente(u).k==='attesa').length;
+  let n=data.filter(u=>statoUtente(u).k==='attesa').length;
+  try{ const rq=await sb.rpc('admin_richieste'); if(rq.data) n+=rq.data.filter(r=>!r.gestita).length; }catch(e){}
   const b=document.getElementById('adminBadge'); if(b) b.innerHTML=n?`<span class="nav-badge" title="${n} in attesa di attivazione">${n}</span>`:'';
 }
 async function apriAdmin(){
   mostraPagina('clienti');
   const lr=document.getElementById('linkReg'); if(lr) lr.textContent=linkRegistrazione();
+  const ls=document.getElementById('linkSito'); if(ls){ ls.textContent=linkSito(); document.getElementById('apriSito').href=linkSito(); }
+  caricaRichieste();
   document.getElementById('adminLista').innerHTML='<div style="padding:24px;color:var(--text3);">Caricamento…</div>';
   const {data,error}=await sb.rpc('admin_lista_utenti');
   if(error){ document.getElementById('adminLista').innerHTML='<div style="padding:24px;color:var(--red);">'+escH(erroreIT(error))+'</div>'; return; }
@@ -1965,6 +1975,36 @@ async function apriAdmin(){
 }
 function chiudiAdmin(){ goHome(); }
 function linkRegistrazione(){ return (CFG.URL_APP||((location.origin+location.pathname).replace(/index\.html$/,'')))+'#registrati'; }
+function linkSito(){ return (CFG.URL_APP||((location.origin+location.pathname).replace(/index\.html$/,'')))+'sito/'; }
+async function copiaTesto(t,btn){ try{ await navigator.clipboard.writeText(t); btn.textContent='✓ Copiato'; }catch(e){ prompt('Copia:',t); } setTimeout(()=>{ btn.textContent='Copia link'; },2000); }
+let RICH=[];
+async function caricaRichieste(){
+  const {data,error}=await sb.rpc('admin_richieste');
+  const box=document.getElementById('richLista'); if(!box) return;
+  if(error){ box.textContent='Errore: '+erroreIT(error); return; }
+  RICH=data||[]; renderRichieste();
+}
+function renderRichieste(){
+  const box=document.getElementById('richLista'); if(!box) return;
+  const tutte=document.getElementById('richTutte').checked;
+  const nuove=RICH.filter(r=>!r.gestita).length;
+  const n=document.getElementById('richN'); n.textContent=nuove?nuove+' da gestire':'nessuna nuova'; n.style.cssText+=nuove?';background:var(--red-soft);color:#b91c1c;':';background:var(--bg3);color:var(--text3);';
+  const lista=RICH.filter(r=>tutte||!r.gestita);
+  if(!lista.length){ box.innerHTML='<div style="padding:8px 0;">Nessuna richiesta '+(tutte?'':'da gestire')+'. Condividi il link del sito per riceverne.</div>'; return; }
+  box.innerHTML=lista.map(r=>`<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border);${r.gestita?'opacity:.55;':''}">
+    <div style="flex:1;min-width:0;color:var(--text);">
+      <div style="font-weight:700;">${escH(r.nome)}${r.azienda?` <span style="font-weight:500;color:var(--text2);">— ${escH(r.azienda)}</span>`:''}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px;">📧 <a href="mailto:${escH(r.email)}" style="color:var(--accent);">${escH(r.email)}</a>${r.telefono?` &nbsp; 📞 ${escH(r.telefono)}`:''}${r.n_aziende?` &nbsp; 🏢 ${escH(r.n_aziende)} aziende`:''}</div>
+      ${r.messaggio?`<div style="font-size:12.5px;color:var(--text2);margin-top:6px;background:var(--bg);border-radius:8px;padding:8px 10px;white-space:pre-line;">${escH(r.messaggio)}</div>`:''}
+    </div>
+    <div style="text-align:right;flex-shrink:0;"><div style="font-size:11px;color:var(--text3);margin-bottom:6px;">${fDate(String(r.creata_il).slice(0,10))}</div>
+      <button class="btn btn-secondary btn-sm" onclick="segnaRichiesta(${r.id},${!r.gestita})">${r.gestita?'Riapri':'✓ Gestita'}</button></div></div>`).join('');
+}
+async function segnaRichiesta(id,val){
+  const {error}=await sb.rpc('admin_richiesta_gestita',{rid:id,valore:val});
+  if(error){ alert(erroreIT(error)); return; }
+  const r=RICH.find(x=>x.id===id); if(r) r.gestita=val; renderRichieste(); aggiornaBadge();
+}
 async function copiaLinkReg(btn){
   const t=linkRegistrazione();
   try{ await navigator.clipboard.writeText(t); btn.textContent='✓ Copiato'; }catch(e){ prompt('Copia il link:',t); }
@@ -1988,7 +2028,7 @@ function renderAdmin(){
     return `<tr>
       <td><div style="font-weight:700;">${escH([u.nome,u.cognome].filter(Boolean).join(' ')||'—')}</div><div style="font-size:12px;">${escH(u.email)}</div>
         ${u.azienda?`<div style="font-size:12px;font-weight:600;color:var(--text2);margin-top:3px;">🏢 ${escH(u.azienda)}${u.piva?` <span style="font-weight:500;color:var(--text3);">· P.IVA ${escH(u.piva)}</span>`:''}</div>`:''}
-        ${(u.indirizzo||u.citta)?`<div style="font-size:11px;color:var(--text3);">📍 ${escH([u.indirizzo,[u.cap,u.citta].filter(Boolean).join(' '),u.provincia?'('+u.provincia+')':''].filter(Boolean).join(', '))}</div>`:''}
+        ${(u.indirizzo||u.citta)?`<div style="font-size:11px;color:var(--text3);">📍 ${escH([u.indirizzo,[u.cap,u.citta,u.provincia?'('+u.provincia+')':''].filter(Boolean).join(' ')].filter(Boolean).join(', '))}</div>`:''}
         ${u.telefono?`<div style="font-size:11px;color:var(--text3);">📞 ${escH(u.telefono)}</div>`:''}
         ${u.gestionali?`<div style="font-size:11px;color:var(--text3);">🗂 ${escH(u.gestionali)}</div>`:''}</td>
       <td style="font-size:12px;white-space:nowrap;">${fDate(String(u.registrato_il).slice(0,10))}${u.ultimo_accesso?`<div style="font-size:11px;color:var(--text3);">ultimo accesso ${fDate(String(u.ultimo_accesso).slice(0,10))}</div>`:''}</td>
@@ -1996,11 +2036,11 @@ function renderAdmin(){
       <td>${u.admin?'—':`<select id="ad_p_${id}" style="min-width:110px;">${['','Prova','Mensile','Trimestrale','Semestrale','Annuale','Omaggio'].map(x=>`<option ${String(u.piano||'')===x?'selected':''} value="${x}">${x||'—'}</option>`).join('')}</select>`}</td>
       <td>${u.admin?'—':`<input type="date" id="ad_s_${id}" value="${u.scadenza||''}" style="min-width:140px;">`}</td>
       <td>${u.admin?'':`<input type="text" id="ad_n_${id}" value="${escH(u.note||'')}" placeholder="es. pagato bonifico" style="min-width:140px;">`}</td>
-      <td style="white-space:nowrap;">${u.admin?'':`
+      <td style="min-width:200px;"><div style="display:flex;flex-wrap:wrap;gap:4px;">${u.admin?'':`
         <button class="btn btn-secondary btn-sm" onclick="rinnova('${id}',1,'Mensile')">+1 mese</button>
         <button class="btn btn-secondary btn-sm" onclick="rinnova('${id}',12,'Annuale')">+1 anno</button>
         <button class="btn btn-primary btn-sm" onclick="salvaAbbonamento('${id}')">Salva</button>
-        <button class="btn btn-danger btn-sm" onclick="sospendi('${id}')">Sospendi</button>`}</td></tr>`;}).join('')}</tbody></table>`;
+        <button class="btn btn-danger btn-sm" onclick="sospendi('${id}')">Sospendi</button>`}</div></td></tr>`;}).join('')}</tbody></table>`;
 }
 function rinnova(id,mesi,piano){
   const u=ADMIN.utenti.find(x=>x.user_id===id); const oggi=isoOggi();
