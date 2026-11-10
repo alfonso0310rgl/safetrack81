@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SafeTrack 81 — Il gestionale delle scadenze per la sicurezza sul lavoro</title>
 <meta name="description" content="DVR, nomine, formazione e idoneità mediche di tutte le tue aziende in un'unica schermata. Avvisi automatici via email a 30 giorni, a 7 giorni e alla scadenza.">
+<link rel="canonical" href="https://alfonso0310rgl.github.io/safetrack81/sito/">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SafeTrack 81 — Il gestionale delle scadenze per la sicurezza sul lavoro">
+<meta property="og:description" content="DVR, nomine, formazione e idoneità mediche di tutte le tue aziende in un'unica schermata, con avvisi automatici prima di ogni scadenza.">
+<meta property="og:url" content="https://alfonso0310rgl.github.io/safetrack81/sito/">
+<meta property="og:locale" content="it_IT">
+<!-- Verifica Google Search Console: incolla qui il meta tag che ti dà Google -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="../config.js"></script>
@@ -218,6 +226,10 @@
   .f-ok{text-align:center;padding:30px 10px}
   .f-ok .v-ic{margin:0 auto 14px;width:60px;height:60px;font-size:28px;background:var(--verde-soft)}
 
+  .cookie{position:fixed;left:16px;right:16px;bottom:16px;z-index:100;max-width:720px;margin:0 auto;background:var(--caffe);color:#f3e7d8;border-radius:16px;padding:18px 20px;display:none;gap:16px;align-items:center;flex-wrap:wrap;box-shadow:0 20px 50px rgba(0,0,0,.3);font-size:14px}
+  .cookie p{flex:1;min-width:240px;line-height:1.5}
+  .cookie .btn{padding:10px 16px;font-size:14px}
+  .cookie .btn-g{color:#f3e7d8;box-shadow:inset 0 0 0 1.5px rgba(255,240,220,.3)}
   footer{background:var(--caffe);color:#bba78f;padding:44px 0;font-size:14px}
   .foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
   footer a{color:#e2d2bf}
@@ -468,17 +480,49 @@
 </section>
 </main>
 
+<div class="cookie" id="cookie" role="dialog" aria-label="Preferenze cookie">
+  <p>Usiamo cookie di Google Ads solo per misurare quante richieste arrivano dalla pubblicità. Nessun cookie viene usato senza il tuo consenso.</p>
+  <button class="btn btn-g" type="button" onclick="consenso(false)">Rifiuta</button>
+  <button class="btn btn-p" type="button" onclick="consenso(true)">Accetta</button>
+</div>
+
 <footer>
   <div class="wrap foot">
     <div style="display:flex;align-items:center;gap:10px;"><span class="logo-m" style="width:30px;height:30px;font-size:14px;">🛡️</span><strong style="color:#fff;font-family:var(--disp);font-size:17px;">SafeTrack 81</strong></div>
     <div>Gestionale delle scadenze per la sicurezza sul lavoro, D.Lgs. 81/08</div>
-    <div><a href="../">Accedi al gestionale</a></div>
+    <div><a href="../">Accedi al gestionale</a> &nbsp; <a href="#" onclick="document.getElementById('cookie').style.display='flex';return false;">Preferenze cookie</a></div>
   </div>
 </footer>
 
 <script>
 const CFG = window.SAFETRACK_CONFIG || {};
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---------- Google Ads: si attiva solo se configurato in config.js e solo con il consenso ----------
+const GADS = CFG.GOOGLE_ADS_ID || '';
+window.dataLayer = window.dataLayer || [];
+function gtag(){ dataLayer.push(arguments); }
+let gadsCaricato = false;
+function caricaGads(){
+  if (!GADS || gadsCaricato) return; gadsCaricato = true;
+  const s = document.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GADS); document.head.appendChild(s);
+  gtag('js', new Date()); gtag('config', GADS);
+}
+function leggiConsenso(){ try { return localStorage.getItem('st81_consenso'); } catch(e) { return null; } }
+function consenso(si){
+  try { localStorage.setItem('st81_consenso', si ? 'si' : 'no'); } catch(e) {}
+  document.getElementById('cookie').style.display = 'none';
+  gtag('consent', 'update', {ad_storage: si?'granted':'denied', ad_user_data: si?'granted':'denied', ad_personalization: si?'granted':'denied', analytics_storage: si?'granted':'denied'});
+  if (si) caricaGads();
+}
+if (GADS) {
+  gtag('consent', 'default', {ad_storage:'denied', ad_user_data:'denied', ad_personalization:'denied', analytics_storage:'denied'});
+  const c = leggiConsenso();
+  if (c === 'si') consenso(true); else if (c !== 'no') document.getElementById('cookie').style.display = 'flex';
+}
+function segnaConversione(){
+  if (GADS && CFG.GOOGLE_ADS_CONVERSIONE && leggiConsenso() === 'si') gtag('event', 'conversion', {send_to: GADS + '/' + CFG.GOOGLE_ADS_CONVERSIONE});
+}
 
 // ---------- barra di navigazione ----------
 addEventListener('scroll', () => document.getElementById('nav').classList.toggle('scrolled', scrollY > 10), {passive:true});
@@ -524,6 +568,7 @@ async function inviaRichiesta(ev){
       const t = await r.text();
       throw new Error(/Troppe richieste/.test(t) ? 'Hai già inviato diverse richieste: ti risponderemo a breve.' : 'Invio non riuscito. Riprova tra poco oppure scrivici via email.');
     }
+    segnaConversione();
     document.getElementById('cfCampi').innerHTML = `<div class="f-ok"><div class="v-ic">✓</div><h3 style="font-size:24px;">Richiesta inviata</h3><p style="color:var(--testo2);margin-top:8px;">Grazie ${esc(d.nome.split(' ')[0])}, ti rispondiamo a <strong>${esc(d.email)}</strong> entro un giorno lavorativo.</p></div>`;
   } catch (e) {
     err(e.message || 'Invio non riuscito. Controlla la connessione e riprova.');

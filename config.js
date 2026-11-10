@@ -9,6 +9,10 @@ window.SAFETRACK_CONFIG = {
   CONTATTO_TELEFONO: "338 523 5897",
   CONTATTO_WHATSAPP: "338 523 5897",              // mostrato nel sito di presentazione
 
+  // Google Ads (sito di presentazione). Lascia vuoto finché non hai l'account.
+  GOOGLE_ADS_ID: "",                 // es. "AW-123456789"
+  GOOGLE_ADS_CONVERSIONE: "",        // etichetta della conversione "Richiesta contatto", es. "AbC-D_efG-h12_34-567"
+
   // Link all'informativa privacy (facoltativo)
   PRIVACY_URL: ""
 };
