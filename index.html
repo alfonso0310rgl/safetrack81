@@ -216,6 +216,13 @@
   .dci:hover { background: rgba(184,87,29,0.07); }
   .dci input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; pointer-events: none; }
   .dci label { font-size: 13px; font-weight: 500; color: var(--text); text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer; pointer-events: none; flex: 1; }
+  .dip-search input, .dip-q { width:100%; margin-bottom:6px; }
+  .dip-chips { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:6px; max-height:90px; overflow-y:auto; }
+  .dip-chips:empty { display:none; }
+  .dip-chip { background:var(--accent); color:#fff; font-size:11px; font-weight:600; padding:3px 9px; border-radius:999px; cursor:pointer; }
+  .dip-chip:hover { background:#96440f; }
+  .dip-count { margin-left:auto; font-size:11px; font-weight:600; color:var(--text2); align-self:center; }
+  .dci.dci-first { background: rgba(184,87,29,0.12); outline:1px solid rgba(184,87,29,0.35); }
   .ca { display: flex; gap: 8px; margin-bottom: 6px; }
   .ca button { background: var(--bg4); border: 1px solid var(--border2); color: var(--text2); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; }
   .ca button:hover { background: var(--border2); }
@@ -1101,18 +1108,57 @@ function closeModal(){if(typeof TG_TIMER!=='undefined'&&TG_TIMER){clearInterval(
 function closeModalOutside(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
 
 // HELPER: checklist dipendenti
+function normTxt(t){return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function dipMatch(d,q){const t=normTxt(d.nome+' '+d.cognome+' '+d.cognome+' '+d.nome+' '+(d.mansione||'')+' '+(d.cf||''));return normTxt(q).split(/\s+/).filter(Boolean).every(w=>t.includes(w));}
 function dipChecklist(dips,prefix){
   if(dips.length===0) return '<div class="no-items" style="padding:10px;">Nessun dipendente attivo.</div>';
-  return `<div class="ca"><button type="button" onclick="selAll('${prefix}',true)">Seleziona tutti</button><button type="button" onclick="selAll('${prefix}',false)">Deseleziona tutti</button></div>
-  <div class="dip-checklist">${dips.map(d=>`
-    <div class="dci" onclick="toggleCheck('${prefix}_${d.id}')">
+  return `<div class="dip-search"><input type="text" id="q_${prefix}" placeholder="🔍 Scrivi nome o cognome… (Invio per spuntare)" autocomplete="off" oninput="filtraChecklist('${prefix}')" onkeydown="tastoChecklist(event,'${prefix}')"></div>
+  <div class="ca"><button type="button" onclick="selAll('${prefix}',true)">Seleziona tutti</button><button type="button" onclick="selAll('${prefix}',false)">Deseleziona tutti</button><span class="dip-count" id="cnt_${prefix}">0 selezionati su ${dips.length}</span></div>
+  <div class="dip-chips" id="chips_${prefix}"></div>
+  <div class="dip-checklist" id="list_${prefix}">${dips.map(d=>`
+    <div class="dci" data-dip="${d.id}" onclick="toggleCheck('${prefix}_${d.id}')">
       <input type="checkbox" id="${prefix}_${d.id}" value="${d.id}">
-      <label>${d.nome} ${d.cognome}${d.mansione?' — '+d.mansione:''}</label>
+      <label>${escH(d.nome+' '+d.cognome)}${d.mansione?' — '+escH(d.mansione):''}</label>
     </div>`).join('')}
+    <div class="no-items dip-none" style="display:none;padding:10px;">Nessun dipendente trovato.</div>
   </div>`;
 }
-function toggleCheck(id){ const cb=document.getElementById(id); if(cb) cb.checked=!cb.checked; }
-function selAll(prefix,val){document.querySelectorAll(`[id^="${prefix}_"]`).forEach(cb=>{if(cb.type==='checkbox')cb.checked=val;});}
+function _dipsAttivi(){const c=getCompany();return (c&&c.dipendenti||[]).filter(d=>d.attivo);}
+function filtraChecklist(prefix){
+  const q=(document.getElementById('q_'+prefix)||{}).value||'';const byId={};_dipsAttivi().forEach(d=>byId[d.id]=d);
+  let vis=0;document.querySelectorAll('#list_'+prefix+' .dci').forEach(el=>{const d=byId[el.dataset.dip];const ok=!q.trim()||(d&&dipMatch(d,q));el.style.display=ok?'':'none';el.classList.remove('dci-first');if(ok)vis++;});
+  const first=Array.from(document.querySelectorAll('#list_'+prefix+' .dci')).find(el=>el.style.display!=='none');
+  if(q.trim()&&first)first.classList.add('dci-first');
+  const none=document.querySelector('#list_'+prefix+' .dip-none');if(none)none.style.display=vis?'none':'';
+}
+function tastoChecklist(e,prefix){
+  if(e.key!=='Enter')return;e.preventDefault();
+  const inp=e.target;if(!inp.value.trim())return;
+  const vis=Array.from(document.querySelectorAll('#list_'+prefix+' .dci')).filter(el=>el.style.display!=='none');
+  if(!vis.length)return;
+  const cb=vis[0].querySelector('input');cb.checked=!cb.checked;
+  inp.value='';filtraChecklist(prefix);contaChecklist(prefix);inp.focus();
+}
+function contaChecklist(prefix){const el=document.getElementById('cnt_'+prefix);if(!el)return;const tot=document.querySelectorAll('#list_'+prefix+' input[type=checkbox]').length;const sel=getChecked(prefix);el.textContent=sel.length+' selezionati su '+tot;
+  const ch=document.getElementById('chips_'+prefix);if(ch){const byId={};_dipsAttivi().forEach(d=>byId[d.id]=d);ch.innerHTML=sel.map(id=>{const d=byId[id];return d?`<span class="dip-chip" onclick="toggleCheck('${prefix}_${id}')" title="Togli">${escH(d.nome+' '+d.cognome)} ✕</span>`:'';}).join('');}}
+function dipSelect(dips,selId,extra){
+  const opts=dips.map(d=>`<option value="${d.id}" ${d.id===selId?'selected':''}>${escH(d.nome+' '+d.cognome)}${d.attivo===false?' (non in forza)':''}${d.mansione?' — '+escH(d.mansione):''}</option>`).join('');
+  window._dipSelList=dips;
+  return `<input type="text" id="f_dip_q" class="dip-q" placeholder="🔍 Scrivi per cercare il dipendente…" autocomplete="off" oninput="filtraDipSelect()" onkeydown="if(event.key==='Enter'){event.preventDefault();}">
+  <select id="f_dip">${extra||'<option value="">-- Seleziona --</option>'}${opts}</select>`;
+}
+function filtraDipSelect(){
+  const q=document.getElementById('f_dip_q').value,sel=document.getElementById('f_dip');const dips=window._dipSelList||[];
+  const keep=sel.value;const extra=Array.from(sel.options).filter(o=>!dips.some(d=>d.id===o.value));
+  const trov=dips.filter(d=>!q.trim()||dipMatch(d,q));
+  sel.innerHTML='';
+  if(!q.trim())extra.forEach(o=>sel.appendChild(o));
+  if(q.trim()&&!trov.length){const o=document.createElement('option');o.value='';o.textContent='— nessun dipendente trovato —';sel.appendChild(o);}
+  trov.forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=d.nome+' '+d.cognome+(d.attivo===false?' (non in forza)':'')+(d.mansione?' — '+d.mansione:'');sel.appendChild(o);});
+  if(q.trim()&&trov.length)sel.value=trov[0].id;else if(Array.from(sel.options).some(o=>o.value===keep))sel.value=keep;
+}
+function toggleCheck(id){ const cb=document.getElementById(id); if(cb) cb.checked=!cb.checked; contaChecklist(id.split('_')[0]); }
+function selAll(prefix,val){document.querySelectorAll(`[id^="${prefix}_"]`).forEach(cb=>{if(cb.type==='checkbox'&&(!val||cb.closest('.dci').style.display!=='none'))cb.checked=val;});contaChecklist(prefix);}
 function getChecked(prefix){return Array.from(document.querySelectorAll(`[id^="${prefix}_"]:checked`)).map(cb=>cb.value);}
 function calcScad(dcId,anniId,scId){const dc=v(dcId),anni=parseInt(v(anniId));if(dc&&anni>0)document.getElementById(scId).value=addYears(dc,anni);}
 
@@ -1226,7 +1272,7 @@ function mEditRecord(spec){
   let h=`<button class="mc" onclick="closeModal()">✕</button><h3>✎ ${cfg.title}${kind==='formazione'?' — '+escH(r.tipo):''}</h3>`;
   if(cfg.dip){
     const trovato=dips.some(d=>d.id===r.dipendenteId);
-    h+=`<div class="fg"><label>Dipendente</label><select id="f_dip">${trovato?'':`<option value="${r.dipendenteId||''}" selected>— dipendente non trovato —</option>`}${dips.map(d=>`<option value="${d.id}" ${d.id===r.dipendenteId?'selected':''}>${escH(d.nome+' '+d.cognome)}${d.attivo?'':' (non in forza)'}</option>`).join('')}</select></div>`;
+    h+=`<div class="fg"><label>Dipendente</label>${dipSelect(dips,r.dipendenteId,trovato?'':`<option value="${r.dipendenteId||''}" selected>— dipendente non trovato —</option>`)}</div>`;
   }
   if(cfg.name) h+=`<div class="fg"><label>Nome *</label><input type="text" id="f_nome" value="${escH(r.nome)}"></div>`;
   if(kind==='formazione'){
@@ -1290,7 +1336,7 @@ function saveAltroDocumento(){const nome=v('f_nome');if(!nome){alert('Inserisci 
 // IDONEITÀ SINGOLA
 function mIdoneitaSingola(){const c=getCompany();const dips=(c.dipendenti||[]).filter(d=>d.attivo);return`<button class="mc" onclick="closeModal()">✕</button>
   <h3>📋 Idoneità Medica — Singola</h3>
-  <div class="fg"><label>Dipendente *</label><select id="f_dip"><option value="">-- Seleziona --</option>${dips.map(d=>`<option value="${d.id}">${d.nome} ${d.cognome}</option>`).join('')}</select></div>
+  <div class="fg"><label>Dipendente *</label>${dipSelect(dips)}</div>
   <div class="fr3">
     <div><label>Data Visita</label><input type="date" id="f_data" onchange="calcScad('f_data','f_anni','f_scad')"></div>
     <div><label>Anni Validità</label><input type="number" id="f_anni" min="1" max="10" value="2" onchange="calcScad('f_data','f_anni','f_scad')"></div>
@@ -1320,7 +1366,7 @@ function livOpt(tipo){if(tipo==='ANTINCENDIO') return '<option value="LIVELLO I"
 function defAnni(tipo){if(tipo==='ANTINCENDIO'||tipo==='PRIMO SOCCORSO') return 3;return 5;}
 function mFormazione(tipo){const c=getCompany();const dips=(c.dipendenti||[]).filter(d=>d.attivo);const icon=tipo==='ANTINCENDIO'?'🔥':tipo==='PRIMO SOCCORSO'?'🚑':'🎓';return`<button class="mc" onclick="closeModal()">✕</button>
   <h3>${icon} ${tipo} — Singolo</h3>
-  <div class="fg"><label>Dipendente *</label><select id="f_dip"><option value="">-- Seleziona --</option>${dips.map(d=>`<option value="${d.id}">${d.nome} ${d.cognome}</option>`).join('')}</select></div>
+  <div class="fg"><label>Dipendente *</label>${dipSelect(dips)}</div>
   <div class="fg"><label>Livello / Rischio</label><select id="f_livello">${livOpt(tipo)}</select></div>
   <div class="fr3">
     <div><label>Data Corso</label><input type="date" id="f_data" onchange="calcScad('f_data','f_anni','f_scad')"></div>
@@ -1350,7 +1396,7 @@ function saveFormG(tipo){const sel=getChecked('gfor');if(sel.length===0){alert('
 // ALTRO CORSO SINGOLO
 function mAltroCorso(){const c=getCompany();const dips=(c.dipendenti||[]).filter(d=>d.attivo);return`<button class="mc" onclick="closeModal()">✕</button>
   <h3>📚 Altro Corso — Singolo</h3>
-  <div class="fg"><label>Dipendente *</label><select id="f_dip"><option value="">-- Seleziona --</option>${dips.map(d=>`<option value="${d.id}">${d.nome} ${d.cognome}</option>`).join('')}</select></div>
+  <div class="fg"><label>Dipendente *</label>${dipSelect(dips)}</div>
   <div class="fg"><label>Nome Corso *</label><input type="text" id="f_nome" placeholder="es. Operatore Carrelli Elevatori"></div>
   <div class="fr3">
     <div><label>Data Corso</label><input type="date" id="f_data" onchange="calcScad('f_data','f_anni','f_scad')"></div>
