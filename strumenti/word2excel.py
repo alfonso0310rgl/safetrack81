@@ -19,6 +19,10 @@ def dte(s, ctx=''):
     """prima data valida nel testo; '16-17-18/01/2024' -> 18/01/2024"""
     s = (s or '').replace('//', '/')
     if re.search(r'(?i)senza data', s): return None
+    m0 = re.fullmatch(r'.*?\b(\d{1,2})-(\d{1,2})-(\d{4})\b.*', s)
+    if m0:
+        try: return dt.date(int(m0[3]), int(m0[2]), int(m0[1]))
+        except ValueError: pass
     m = re.search(r'((?:\d{1,2}\s*-\s*)+)(\d{1,2})/(\d{1,2})/(\d{4})', s) or re.search(r'()(\d{1,2})[/.](\d{1,2})[/.](\d{4})', s)
     if not m: return None
     try: return dt.date(int(m[4]), int(m[3]), int(m[2]))
@@ -128,7 +132,7 @@ def leggi(path):
     ultimo = ''; consulente = False; assunz = {}; correzioni_cf = {}
     for t in righe[1:]:
         if re.search(r'(?i)consulente', t): consulente = True
-        if '@' in t and not az.get('email') and not consulente:
+        if '@' in t and not az.get('email') and not consulente and not ultimo:
             em = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', t)
             if em: az['email'] = em[0]
         if '@' not in t and not re.search(r'(?i)consulente', t) and not t.startswith('michela'): consulente = consulente and '@' in t
@@ -151,6 +155,7 @@ def leggi(path):
                 if mp and len(mp[1]) < 60 and re.search(r'(?i)verbale|prova|riunione', mp[1]): lab, sep, rest = mp[1], ':', mp[2]
             if not sep or not dte(rest): continue
         L = norm(lab); rest = clean(rest).rstrip(':').strip()
+        rest = re.sub(r'(?<=[A-Za-z)])\s*:\s*(?=\d)', ' – ', rest)
         if L in ('att', 'attagg') and ultimo: L = L + ultimo; lab = lab + ' ' + ultimo
         for ruolo in ('rspp', 'preposto', 'rls', 'medicocompetente'):
             if ruolo in L: ultimo = ruolo
@@ -179,6 +184,10 @@ def leggi(path):
                 if sedeL and data: rspp['note'].append(f'Nomina {sedeL[1].title()}: {data:%d/%m/%Y}')
                 if nota: rspp['note'].append('Nomina: ' + nota)
             else:
+                if rspp['nome'] and nome and not (set(parole(rspp['nome'])) <= set(parole(nome)) or set(parole(nome)) <= set(parole(rspp['nome']))):
+                    if norm(nome) in prep and data: prep[norm(nome)]['att'].append(data)
+                    AVVISI.append(f'{ctx}: "{clean(lab)}: {nome}" — il nome non è quello dell\'RSPP ({rspp["nome"]}); ' + ('considerato attestato del preposto' if norm(nome) in prep else 'non importato'))
+                    continue
                 rspp['nome'] = rspp['nome'] or nome
                 if data: rspp['att'].append(data)
                 elif nota: rspp['note'].append('Attestato: ' + nota)
@@ -323,6 +332,7 @@ def leggi(path):
                     R['ido'].append([cog, nom, cf, vd, int(ma[1]) if ma else 1, ''])
             continue
         # ----- tabelle corsi (formato libero) -----
+        if any(len(p) > 120 or re.search(r'(?i)visite mediche\s*:', p) for r in rows for c in r for p in c): continue
         if re.search(r'(?i)legenda', (prime[ti] if ti < len(prime) else '')) or re.search(r'(?i)lavoratori (assunti|non)', ' '.join(' '.join(c) for r in rows for c in r)): continue
         corso = ''; pend = []; prec = ''
         def nodata(nomi, cr):
@@ -342,7 +352,9 @@ def leggi(path):
                 x = dte(t, f'{ctx} — {corso or txt[0]}')
                 if x: ds.append(x)
                 elif re.search(r'\d{1,2}[/.]\d{1,2}', t): continue
-                elif not re.fullmatch(r'(?i)(formazione|aggiornamento|nominativo|data|attestato)', norm(t)): tc.append(c)
+                elif re.fullmatch(r'(formazione|aggiornament\w*|aggformazione|nominativo|nome|data|attestato)', norm(t)): continue
+                elif re.match(r'(?i)^\(?\s*(in corso|fatto test|da fare|da chiudere|gi[aà].{0,2}lo tiene|test da chiudere|manca|non |da agg|online)', t): continue
+                else: tc.append(c)
             def set_corso(t):
                 nonlocal corso, prec
                 t = clean(t)
@@ -388,6 +400,12 @@ def leggi(path):
                 if len(A) != len(B): return False
                 diff = [(x, y) for x, y in zip(A, B) if x != y]
                 return len(diff) == 1 and abs(len(diff[0][0]) - len(diff[0][1])) <= 1 and difflib.SequenceMatcher(None, *diff[0]).ratio() >= 0.75
+            w = n.split()
+            for cut in range(2, len(w) - 1):
+                a1, b1 = chiave(' '.join(w[:cut])), chiave(' '.join(w[cut:]))
+                if a1 in idx and b1 in idx:
+                    R['for'].append(['@' + ' '.join(w[cut:])] + f[1:]); n = ' '.join(w[:cut]); k = a1
+                    AVVISI.append(f'{ctx}: "{" ".join(w)}" diviso in due persone nel corso "{f[3]}"'); break
             simili = [x for x in idx if quasi(k, x)] or [x for x in idx if len(k.split()) >= 2 and set(k.split()) < set(x.split())]
             if len(simili) == 1:
                 AVVISI.append(f'{ctx}: "{n}" nel corso "{f[3]}" associato a {" ".join(idx[simili[0]][:2])} (nome scritto in modo diverso)')
@@ -429,6 +447,12 @@ def scrivi(out, docs):
         if nomi.count(a['nome']) > 1:
             m = re.search(r'\d{5}\s*-?\s*([A-Z’\' .]+?)\s*\((\w\w)\)', a.get('so', '')) or re.search(r'\d{5}\s*-?\s*([A-Z’\' .]+?)\s*\((\w\w)\)', a.get('sl', ''))
             if m: a['nome'] = f"{a['nome']} - {clean(m[1])} ({m[2]})"
+    nomi2 = [R['az']['nome'] for R in letti]
+    for R in letti:
+        a = R['az']
+        if nomi2.count(a['nome']) > 1:
+            via = clean(re.split(r'\s+[-–]\s+\d{5}', a.get('so', ''))[0])
+            if via: a['nome'] = f"{a['nome'].split(' - ')[0]} - {via}"
         N = a['nome']
         put('Aziende', [N, a.get('piva'), a.get('settore'), a.get('email'), a.get('ref'), a.get('sl'), a.get('so'), None])
         for r in R['dip']: put('Dipendenti', [N] + r)
