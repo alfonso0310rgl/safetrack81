@@ -131,7 +131,7 @@ def leggi(path):
     rspp = {'nome': '', 'nom': None, 'att': [], 'note': []}
     prep, rls = {}, {}
     medico = None; dvr = []
-    ultimo = ''; consulente = False; assunz = {}; correzioni_cf = {}
+    ultimo = ''; consulente = False; assunz = {}; correzioni_cf = {}; att_rspp_altri = {}
     for t in righe[1:]:
         if re.search(r'(?i)consulente', t): consulente = True
         if '@' in t and not az.get('email') and not consulente and not ultimo:
@@ -188,8 +188,8 @@ def leggi(path):
                 if nota: rspp['note'].append('Nomina: ' + nota)
             else:
                 if rspp['nome'] and nome and not (set(parole(rspp['nome'])) <= set(parole(nome)) or set(parole(nome)) <= set(parole(rspp['nome']))):
-                    if norm(nome) in prep and data: prep[norm(nome)]['att'].append(data)
-                    AVVISI.append(f'{ctx}: "{clean(lab)}: {nome}" — il nome non è quello dell\'RSPP ({rspp["nome"]}); ' + ('considerato attestato del preposto' if norm(nome) in prep else 'non importato'))
+                    # "Att. RSPP" di un'altra persona vicino al preposto: è il suo attestato da preposto (aggiornamento ogni 2 anni)
+                    if data: att_rspp_altri.setdefault(norm(nome), []).append(data)
                     continue
                 rspp['nome'] = rspp['nome'] or nome
                 if data: rspp['att'].append(data)
@@ -228,6 +228,9 @@ def leggi(path):
     if rspp['nome']:
         att = max(rspp['att']) if rspp['att'] else None
         R['fig'].append(['RSPP', rspp['nome'], rspp['nom'], att, 5 if att else None, '; '.join(rspp['note'])])
+    for k0, ds0 in att_rspp_altri.items():
+        if k0 in prep: prep[k0]['att'] += ds0
+        else: AVVISI.append(f'{ctx}: attestato RSPP di {k0.upper()} non collegato: la persona non è né RSPP né preposto — non importato')
     for p in prep.values():
         att = max(p['att']) if p['att'] else None
         R['fig'].append(['Preposto', p['nome'], p['nom'], att, 2 if att else None, '; '.join(dict.fromkeys(p['note']))])
