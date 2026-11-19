@@ -420,6 +420,9 @@ def leggi(path):
         if k in idx:
             f[0], f[1], f[2] = idx[k]
             anno = re.search(r'\b(19|20)(\d\d)\b', f[7] or '')
+            omon = [d0 for d0 in R['dip'] if chiave(d0[0] + ' ' + d0[1]) == k]
+            if len(omon) > 1 and not anno:
+                AVVISI.append(f'{ctx}: ci sono {len(omon)} dipendenti di nome {n}: il corso "{f[3]}" è stato assegnato a quello con codice fiscale {f[2]} — controlla che sia quello giusto')
             if anno:   # omonimi: "CASILLO GIUSEPPE (1983)" -> anno di nascita nel codice fiscale
                 for a, b, cf, *_ in R['dip']:
                     if chiave(a + ' ' + b) == k and cf[6:8] == anno[2]: f[0], f[1], f[2] = a, b, cf; f[7] = ''
