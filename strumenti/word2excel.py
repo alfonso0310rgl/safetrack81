@@ -129,6 +129,9 @@ def leggi(path):
     d = docx.Document(path)
     R = {'az': {}, 'dip': [], 'fig': [], 'doc': [], 'for': [], 'ido': []}
     righe = [clean(p.text) for p in d.paragraphs if clean(p.text)]
+    for tb0 in d.tables:
+        if len(tb0.columns) == 1:
+            righe += [clean(c.text) for r0 in tb0.rows for c in r0.cells[:1] if clean(c.text)]
     p0 = next((p.text for p in d.paragraphs if clean(p.text)), '')
     if re.search(r'\*{2,}\s*[^*]+\*{2,}', p0): righe[0] = clean(re.sub(r'\*{2,}\s*([^*]+?)\s*\*{2,}', r' - \1', p0))
     az = R['az']
@@ -308,13 +311,14 @@ def leggi(path):
             iDA = col('dataassunzione', 'datainizio'); iM = col('mansione'); iF = col('form'); iI = col('inform'); iD = col('dpi'); iV = col('visit')
             liv = rischio(' '.join(head[iF:iF + 1])) if iF is not None else ''
             liv = liv or liv_ateco or 'Rischio alto'
+            dup_tab = []
             for k in range(inizio, len(rows)):
                 r = [[]] * offset + rows[k]
                 g = lambda j: (' '.join(r[j]) if j is not None and j < len(r) else '')
                 n = clean(g(iN))
                 if not n or norm(n).startswith('nominativ'): continue
                 tag = ' '.join(re.findall(r'\((.*?)\)', n)); n = clean(re.sub(r'\(.*?\)', '', n))
-                cf = re.sub(r'\s', '', g(iCF)).upper(); cf = correzioni_cf.get(cf, cf)
+                cf = re.sub(r'[^A-Za-z0-9]', '', g(iCF)).upper(); cf = correzioni_cf.get(cf, cf)
                 cog, nom = dividi(n, cf)
                 dn0 = dte(g(iDN))
                 if dn0 and re.fullmatch(r'[A-Z]{6}\d{2}.*', cf) and cf[6:8] != dn0.strftime('%y'):
@@ -352,7 +356,7 @@ def leggi(path):
                 if fx and not fd: note.append('Formazione: ' + fx)
                 key = cf or norm(cog + nom)
                 if key in visti:
-                    if not datore: AVVISI.append(f'{ctx}: {n} compare due volte nell\'elenco dipendenti — tenuto una volta')
+                    if not datore: dup_tab.append(n)
                     continue
                 visti[key] = 1
                 R['dip'].append([cog, nom, cf, mans, dte(g(iDA)) or assunz.get(' '.join(sorted(parole(n)))), attivo, '; '.join(note)])
@@ -361,8 +365,13 @@ def leggi(path):
                 if vd:
                     ma = re.search(r'(\d+)\s*ANN', vv.upper())
                     R['ido'].append([cog, nom, cf, vd, int(ma[1]) if ma else 1, ''])
+            if len(dup_tab) >= 3: AVVISI.append(f'{ctx}: l\'elenco dipendenti è ripetuto due volte nel Word ({len(dup_tab)} nomi) — tenuto una volta sola')
+            else:
+                for n in dup_tab: AVVISI.append(f'{ctx}: {n} compare due volte nell\'elenco dipendenti — tenuto una volta')
             continue
         # ----- tabelle corsi (formato libero) -----
+        if len(tb.columns) == 1: continue
+        if rows and re.search(r'(?i)\brischi\b|\bfasi\b', ' '.join(' '.join(c) for c in rows[0])) and not dip_tab: continue
         if any(len(p) > 120 or re.search(r'(?i)visite mediche\s*:', p) for r in rows for c in r for p in c): continue
         if re.search(r'(?i)legenda', (prime[ti] if ti < len(prime) else '')) or re.search(r'(?i)lavoratori (assunti|non)', ' '.join(' '.join(c) for r in rows for c in r)): continue
         tutto = ' '.join(p for r in rows for c in r for p in c)
@@ -385,7 +394,7 @@ def leggi(path):
                 x = dte(re.sub(r'\(.*?\)', '', t), f'{ctx} — {corso or txt[0]}')
                 if x: ds.append(x)
                 elif re.search(r'\d{1,2}[/.]\d{1,2}', re.sub(r'\(.*?\)', '', t)): continue
-                elif re.fullmatch(r'(formazione|aggiornament\w*|aggformazione|nominativo|nome|data|attestato)', norm(t)): continue
+                elif re.fullmatch(r'(formazione|aggiornament\w*|aggformazione|nominativo|nominativi|nome|data|attestato|att|aggatt|svoltoil|corso)', norm(t)): continue
                 elif re.match(r'(?i)^\(?\s*(in corso|fatto test|da fare|da chiudere|gi[aà].{0,2}lo tiene|test da chiudere|manca|non |da agg|online)', t): continue
                 else: tc.append(c)
             def set_corso(t):
@@ -477,7 +486,13 @@ def scrivi(out, docs):
         ws = wb[sh]; r = nxt.get(sh, 3); nxt[sh] = r + 1
         for j, v in enumerate(vals, 1):
             if v is not None and v != '': ws.cell(r, j, v)
-    letti = [leggi(p) for p in docs]
+    import hashlib
+    unici, hs = [], set()
+    for p in docs:
+        h = hashlib.md5(open(p, 'rb').read()).hexdigest()
+        if h in hs: AVVISI.append(f'File Word duplicato (identico a un altro): {p.split("/")[-1]} — usato una volta sola'); continue
+        hs.add(h); unici.append(p)
+    letti = [leggi(p) for p in unici]
     nomi = [R['az']['nome'] for R in letti]
     riep = []
     for R in letti:
