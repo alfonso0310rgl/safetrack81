@@ -234,6 +234,8 @@ def leggi(path):
     for r in rls.values():
         att = max(r['att']) if r['att'] else None
         R['fig'].append(['RLS', r['nome'], r['nom'], att, 1 if att else None, '; '.join(r['note'])])
+    if len(rls) > 1:
+        AVVISI.append(f'{ctx}: nel Word ci sono {len(rls)} RLS ({", ".join(r["nome"] for r in rls.values())}): il gestionale ne tiene uno solo, viene caricato l\'ultimo ({list(rls.values())[-1]["nome"]})')
     if medico and medico[0]:
         R['fig'].append(['Medico competente', medico[0], medico[1], None, None, medico[2]])
     if dvr:
@@ -264,6 +266,8 @@ def leggi(path):
                     for col in cols: legenda[col] = 'Non assunto (solo visita medica)'
             elif re.search(r'(?i)amministrator|datore', txt): col_dat |= cols
     visti = {}; prec = ''
+    tutto_doc = ' '.join(p.text for p in d.paragraphs)
+    rosso_rinnovo = bool(re.search(r'(?i)rosso\W{0,3}\s*(da\s+)?rinnov', tutto_doc))
     datore_n = set(parole(az.get('datore', '')))
     liv_ateco = rischio(az.get('settore', ''))
     head_prec = None
@@ -300,7 +304,9 @@ def leggi(path):
                 cells = [None] * offset + list(tb.rows[k].cells)
                 cl = colori(cells[iN]) if cells[iN] is not None else set()
                 tutti = set().union(*[colori(c) for c in cells if c is not None])
-                attivo = 'NO' if any(rosso(c) or c in col_off for c in cl) else 'SI'
+                attivo = 'NO' if any((rosso(c) and not rosso_rinnovo) or c in col_off for c in cl) else 'SI'
+                if rosso_rinnovo and any(rosso(c) for c in cl):
+                    AVVISI.append(f'{ctx}: {n} è in rosso, ma in questo Word il rosso significa "da rinnovare": lasciato in forza')
                 mans0 = clean(g(iM)).strip('/ ')
                 datore = any(giallo(c) or c in col_dat for c in cl) or bool(re.match(r'(?i)^(datore|amminis)', mans0))
                 note = []
