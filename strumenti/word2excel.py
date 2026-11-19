@@ -181,7 +181,7 @@ def leggi(path):
         elif (L.startswith('amministrat') or L.startswith('datoredilavoro')) and not az.get('ref'):
             az['ref'] = ('Datore di lavoro: ' if 'datore' in L else 'Amministratore: ') + rest; az['datore'] = re.sub(r'\(.*?\)', '', rest).strip()
         elif 'rspp' in L:
-            if not L.startswith('att'):
+            if not L.startswith(('att', 'agg')):
                 rspp['nome'] = nome or rspp['nome']; rspp['nom'] = max(filter(None, [rspp['nom'], data]), default=None)
                 sedeL = re.search(r'\(([^)]*)\)', lab)
                 if sedeL and data: rspp['note'].append(f'Nomina {sedeL[1].title()}: {data:%d/%m/%Y}')
@@ -197,15 +197,15 @@ def leggi(path):
         elif 'preposto' in L:
             if not nome: continue
             p = prep.setdefault(norm(nome), {'nome': nome, 'nom': None, 'att': [], 'note': []})
-            if not L.startswith('att'): p['nom'] = data or p['nom']
+            if not L.startswith(('att', 'agg')): p['nom'] = data or p['nom']
             elif data: p['att'].append(data)
             if nota: p['note'].append(nota)
         elif 'rls' in L:
             if not nome: continue
             r = rls.setdefault(norm(nome), {'nome': nome, 'nom': None, 'att': [], 'note': []})
-            if not L.startswith('att'): r['nom'] = data
+            if not L.startswith(('att', 'agg')): r['nom'] = data
             elif data: r['att'].append(data)
-            if nota and not data: r['note'].append(('Attestato: ' if L.startswith('att') else 'Elezione: ') + nota)
+            if nota and not data: r['note'].append(('Attestato: ' if L.startswith(('att', 'agg')) else 'Elezione: ') + nota)
         elif 'medicocompetente' in L:
             medico = [nome or rest, data, nota]
         elif L.startswith('dvr'):
