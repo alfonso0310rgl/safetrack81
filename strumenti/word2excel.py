@@ -17,7 +17,8 @@ def parole(s): return [unicodedata.normalize('NFD', w.upper()).encode('ascii', '
 AVVISI = []
 def dte(s, ctx=''):
     """prima data valida nel testo; '16-17-18/01/2024' -> 18/01/2024"""
-    s = s or ''
+    s = (s or '').replace('//', '/')
+    if re.search(r'(?i)senza data', s): return None
     m = re.search(r'((?:\d{1,2}\s*-\s*)+)(\d{1,2})/(\d{1,2})/(\d{4})', s) or re.search(r'()(\d{1,2})[/.](\d{1,2})[/.](\d{4})', s)
     if not m: return None
     try: return dt.date(int(m[4]), int(m[3]), int(m[2]))
@@ -93,6 +94,18 @@ def anni_corso(nome):
     if 'haccp' in n or 'alimentar' in n: return 3
     return 5
 
+def e_corso(t):
+    t = re.sub(r'\(.*?\)', '', t or '')
+    return bool(re.search(r'(?i)antincend|soccorso|haccp|formaz|corso|addett|conduzion|conduttor|ponteg|carrell|trattor|\bgru\b|\bple\b|quota|\bdpi\b|responsabil|alimentar|attestat|escavat|muletti|elevator|movimento terra|^liv|^(basso|medio|alto)$', t))
+def classifica(corso, settore=''):
+    c = norm(corso); sede = re.findall(r'\(([^)]*)\)', corso)
+    if 'antincendio' in c or c in ('basso', 'medio', 'alto'):
+        return 'Antincendio', livello_antincendio(corso), 5
+    if 'primosoccorso' in c:
+        lvl = 'Gruppo A' if re.search(r'(?i)gruppo\s*a\b', corso) or re.match(r'0[5-9]', settore) else ('Gruppo B/C' if re.search(r'(?i)gruppo\s*[bc]', corso) else '')
+        return 'Primo soccorso', lvl, 3
+    return clean(re.sub(r'(?i)^att\.?\s*', '', corso)), '', anni_corso(corso)
+
 # ---------------- lettura di un Word ----------------
 def leggi(path):
     d = docx.Document(path)
@@ -112,13 +125,18 @@ def leggi(path):
     rspp = {'nome': '', 'nom': None, 'att': [], 'note': []}
     prep, rls = {}, {}
     medico = None; dvr = []
-    ultimo = ''; consulente = False; assunz = {}
+    ultimo = ''; consulente = False; assunz = {}; correzioni_cf = {}
     for t in righe[1:]:
         if re.search(r'(?i)consulente', t): consulente = True
         if '@' in t and not az.get('email') and not consulente:
             em = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', t)
             if em: az['email'] = em[0]
         if '@' not in t and not re.search(r'(?i)consulente', t) and not t.startswith('michela'): consulente = consulente and '@' in t
+        mcf = re.search(r'(?i)modifica codice fiscale di (.+?) da ([A-Z0-9]{16}) a ([A-Z0-9]{16})', t)
+        if mcf:
+            AVVISI.append(f'{ctx}: codice fiscale di {mcf[1]} corretto da {mcf[2]} a {mcf[3]} (come indicato nel Word)')
+            correzioni_cf[mcf[2].upper()] = mcf[3].upper(); continue
+        if re.match(r'(?i)^(mansione .+ da .+ a |sulla visita medica di)', t): AVVISI.append(f'{ctx}: nota nel Word — {t}')
         ma = re.match(r'(?i)^data di assunzione\s+(.+?)\s*:\s*(.*)$', t)
         if ma:
             if dte(ma[2]): assunz[' '.join(sorted(parole(ma[1])))] = dte(ma[2])
@@ -128,6 +146,9 @@ def leggi(path):
         lab, sep, rest = t.partition(':')
         if not sep:
             lab, sep, rest = t.partition(' – ')
+            if not sep:
+                mp = re.match(r'^(.*?)\s+(\d{1,2}[/.]\d{1,2}[/.]\d{4}.*)$', t)
+                if mp and len(mp[1]) < 60 and re.search(r'(?i)verbale|prova|riunione', mp[1]): lab, sep, rest = mp[1], ':', mp[2]
             if not sep or not dte(rest): continue
         L = norm(lab); rest = clean(rest).rstrip(':').strip()
         if L in ('att', 'attagg') and ultimo: L = L + ultimo; lab = lab + ' ' + ultimo
@@ -136,7 +157,7 @@ def leggi(path):
         # nome – data – note
         mm = re.match(r'^(.*?)\s*(?:–|—|\s-\s|-\s*$|-(?=\s*\d))\s*(.*)$', rest)
         nome, coda = (clean(mm[1]), mm[2]) if mm else (re.sub(r'\(.*?\)', '', resto_testo(rest)).strip(), re.sub(r'^[^(]*', '', rest) if not dte(rest) else rest)
-        if re.fullmatch(r'\(.*\)|', nome or ''): nome = ''
+        if re.fullmatch(r'\(.*\)|', nome or '') or re.match(r'(?i)^(da fare|da nominare|da aprire|no\b|in corso)', nome or ''): nome = ''
         data = dte(coda, f'{ctx} — {clean(lab)}')
         nota = resto_testo(coda).strip('() ')
         dafare = bool(re.search(r'(?i)da fare|da nominare|da aprire', coda))
@@ -153,7 +174,9 @@ def leggi(path):
             az['ref'] = ('Datore di lavoro: ' if 'datore' in L else 'Amministratore: ') + rest; az['datore'] = re.sub(r'\(.*?\)', '', rest).strip()
         elif 'rspp' in L:
             if not L.startswith('att'):
-                rspp['nome'] = nome or rspp['nome']; rspp['nom'] = data
+                rspp['nome'] = nome or rspp['nome']; rspp['nom'] = max(filter(None, [rspp['nom'], data]), default=None)
+                sedeL = re.search(r'\(([^)]*)\)', lab)
+                if sedeL and data: rspp['note'].append(f'Nomina {sedeL[1].title()}: {data:%d/%m/%Y}')
                 if nota: rspp['note'].append('Nomina: ' + nota)
             else:
                 rspp['nome'] = rspp['nome'] or nome
@@ -205,33 +228,56 @@ def leggi(path):
         data, rev = max(dvr, key=lambda x: x[0]); R['doc'].insert(0, ['DVR', data, 4, rev, ''])
 
     # ---------- tabelle ----------
-    legenda = {}
+    # paragrafo che precede ogni tabella (es. "DIPENDENTI NOLA:")
+    prime = []; ultimo_p = ''
+    for el in d.element.body.iterchildren():
+        if el.tag == qn('w:p'):
+            t = clean(''.join(x.text or '' for x in el.iter(qn('w:t'))))
+            if t: ultimo_p = t
+        elif el.tag == qn('w:tbl'):
+            prime.append(ultimo_p); ultimo_p = ''
+    # legende di colore: "DIPENDENTI SALERNO", "LAVORATORI NON PIU' PRESENTI", "AMMINISTRATORE"...
+    legenda = {}; col_off = set(); col_dat = set()
     for tb in d.tables:
         for r in tb.rows:
             txt = clean(' '.join(c.text for c in r.cells))
-            mL = re.match(r'(?i)^dipendenti\s+(.+?):?$', txt)
-            if mL:
-                for c in r.cells:
-                    for col in colori(c):
-                        if _rgb(col) and not rosso(col) and not giallo(col): legenda[col] = 'Sede ' + mL[1].strip(' :').title()
+            cols = set().union(*[colori(c) for c in r.cells]) - {x for x in set().union(*[colori(c) for c in r.cells]) if x.startswith('T')}
+            if not cols or len(r.cells) > 3: continue
+            if re.match(r'(?i)^dipendenti\s+(.+?):?$', txt):
+                for col in cols:
+                    if not rosso(col) and not giallo(col): legenda[col] = 'Sede ' + re.match(r'(?i)^dipendenti\s+(.+?):?$', txt)[1].strip(' :').title()
+            elif re.search(r'(?i)non pi[uù]|non assunt|licenziat|cessat', txt):
+                col_off |= cols
+                if re.search(r'(?i)non assunt', txt):
+                    for col in cols: legenda[col] = 'Non assunto (solo visita medica)'
+            elif re.search(r'(?i)amministrator|datore', txt): col_dat |= cols
     visti = {}
     datore_n = set(parole(az.get('datore', '')))
     liv_ateco = rischio(az.get('settore', ''))
-    for tb in d.tables:
+    head_prec = None
+    for ti, tb in enumerate(d.tables):
         rows = [[[clean(p.text) for p in c.paragraphs if clean(p.text)] for c in r.cells] for r in tb.rows]
         if not rows: continue
         head = [norm(' '.join(c)) for c in rows[0]]
-        if any(h.startswith('nominativ') for h in head):
+        offset = 0; inizio = 1
+        dip_tab = len(rows[0]) >= 6 and any(h.startswith('nominativ') for h in head)
+        if not dip_tab and head_prec and len(rows[0]) >= 8 and len(rows[0]) in (len(head_prec), len(head_prec) - 1):
+            head = head_prec; offset = len(head_prec) - len(rows[0]); inizio = 0; dip_tab = True   # riga del datore in tabella a parte
+        if dip_tab:
+            head_prec = head
+            pm = re.match(r'(?i)^dipendenti\s+([A-Za-zÀ-ÿ’\' ]+?)\s*:?$', (prime[ti] if ti < len(prime) else ''))
+            sede = ('Sede ' + pm[1].title()) if pm else ''
             col = lambda *ks: next((j for j, h in enumerate(head) for k in ks if h.startswith(k)), None)
             iN = col('nominativ'); iCF = col('codic'); iDN = col('datadinascita'); iLN = col('luogodinascita', 'logodinascita')
             iDA = col('dataassunzione'); iM = col('mansione'); iF = col('form'); iI = col('inform'); iD = col('dpi'); iV = col('visit')
-            liv = rischio(' '.join(rows[0][iF])) if iF is not None else ''
+            liv = rischio(' '.join(head[iF:iF + 1])) if iF is not None else ''
             liv = liv or liv_ateco or 'Rischio alto'
-            for k, r in enumerate(rows[1:], 1):
+            for k in range(inizio, len(rows)):
+                r = [[]] * offset + rows[k]
                 g = lambda j: (' '.join(r[j]) if j is not None and j < len(r) else '')
                 n = clean(g(iN))
                 if not n or norm(n).startswith('nominativ'): continue
-                cf = re.sub(r'\s', '', g(iCF)).upper()
+                cf = re.sub(r'\s', '', g(iCF)).upper(); cf = correzioni_cf.get(cf, cf)
                 cog, nom = dividi(n, cf)
                 dn0 = dte(g(iDN))
                 if dn0 and re.fullmatch(r'[A-Z]{6}\d{2}.*', cf) and cf[6:8] != dn0.strftime('%y'):
@@ -239,15 +285,16 @@ def leggi(path):
                 if len(parole(n)) < 2: AVVISI.append(f'{ctx}: dipendente "{n}" senza cognome/nome completo — inserito come "{n} (da completare)"')
                 if cf and not re.fullmatch(r'[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]', cf):
                     AVVISI.append(f'{ctx}: codice fiscale da controllare per {n} ({cf})')
-                cells = tb.rows[k].cells
-                cl = colori(cells[iN]); tutti = set().union(*[colori(c) for c in cells])
-                attivo = 'NO' if any(rosso(c) for c in cl) else 'SI'
+                cells = [None] * offset + list(tb.rows[k].cells)
+                cl = colori(cells[iN]) if cells[iN] is not None else set()
+                tutti = set().union(*[colori(c) for c in cells if c is not None])
+                attivo = 'NO' if any(rosso(c) or c in col_off for c in cl) else 'SI'
                 mans0 = clean(g(iM)).strip('/ ')
-                datore = any(giallo(c) for c in cl) or bool(re.match(r'(?i)^(datore|amminis)', mans0))
+                datore = any(giallo(c) or c in col_dat for c in cl) or bool(re.match(r'(?i)^(datore|amminis)', mans0))
                 note = []
                 if datore:
                     mans = 'Amministratore'
-                    note.append('Datore di lavoro' + (' — ' + mans0 if mans0 and not re.match(r'(?i)^(datore|amministr\.?|amministratore)$', mans0) else ''))
+                    note.append('Datore di lavoro' + (' — ' + mans0 if mans0 and not re.match(r'(?i)^(datore|amministr\w*\.?|amministratore)$', mans0) else ''))
                 else: mans = mans0
                 dn = dte(g(iDN)); ln = clean(g(iLN)).strip('/ ')
                 if dn or ln: note.append('Nato il ' + (dn.strftime('%d/%m/%Y') if dn else '?') + (' a ' + ln if ln else ''))
@@ -258,12 +305,11 @@ def leggi(path):
                 elif re.search(r'(?i)da\s*agg', dpi): note.append('DPI da aggiornare')
                 for c in tutti:
                     if c in legenda and legenda[c] not in note: note.append(legenda[c])
-                # formazione lavoratori
+                if sede and sede not in note: note.append(sede)
                 fv = g(iF); fd = dte(fv, f'{ctx} — formazione {n}'); fx = resto_testo(fv).strip('/- ')
                 if fd and dn and fd == dn:
                     AVVISI.append(f'{ctx}: {n} ha come data di formazione {fd:%d/%m/%Y} (coincide con la nascita?) — non importata'); fd = None
                 if fx and not fd: note.append('Formazione: ' + fx)
-                if attivo == 'NO' and fx and fd: note.append(fx)
                 key = cf or norm(cog + nom)
                 if key in visti:
                     if not datore: AVVISI.append(f'{ctx}: {n} compare due volte nell\'elenco dipendenti — tenuto una volta')
@@ -276,42 +322,58 @@ def leggi(path):
                     ma = re.search(r'(\d+)\s*ANN', vv.upper())
                     R['ido'].append([cog, nom, cf, vd, int(ma[1]) if ma else 1, ''])
             continue
-        # tabelle corsi
-        h1 = [norm(' '.join(c)) for c in rows[0][1:]]
-        if h1 and any(x in ('formazione', 'aggiornamento') for x in h1):
-            corso = clean(' '.join(rows[0][0]))
-            for r in rows[1:]:
-                nomi = r[0] if r else []
-                ds = [x for x in (dte(' '.join(c), f'{ctx} — {corso}') for c in r[1:]) if x]
-                if not nomi: continue
-                if not ds: AVVISI.append(f'{ctx}: corso "{corso}" di {", ".join(nomi)} senza data — non importato'); continue
-                for n in nomi:
-                    nota = ''; mm = re.search(r'\((.*?)\)', n)
-                    if mm: nota = mm[1]; n = clean(n[:mm.start()])
-                    R['for'].append(['@' + n, None, None, corso, '', max(ds), anni_corso(corso), nota])
-            continue
-        prec = ''
-        for r in rows:
-            if len(r) < 3: continue
-            corso = clean(' '.join(r[0])); nomi = r[1]; dtxt = ' '.join(' '.join(c) for c in r[2:])
-            if re.fullmatch(r'(?i)(liv\.?\s*\w+|basso|medio|alto)', corso) and prec: corso = prec + ' ' + corso
-            prec = re.sub(r'(?i)\s*(liv(ello)?\.?\s*\w+|basso|medio|alto)$', '', corso) or prec
-            if not nomi or norm(corso).startswith('dipendenti'): continue
-            ds = [x for x in (dte(' '.join(c), f'{ctx} — {corso}') for c in r[2:]) if x]; data = max(ds) if ds else None
-            c = norm(corso)
-            if 'antincendio' in c or c in ('basso', 'medio', 'alto'):
-                tipo, lvl, anni = 'Antincendio', livello_antincendio(corso), 5
-            elif 'primosoccorso' in c:
-                tipo, anni = 'Primo soccorso', 3
-                lvl = 'Gruppo A' if re.search(r'(?i)gruppo\s*a\b', corso) or re.match(r'0[5-9]', az.get('settore', '')) else ('Gruppo B/C' if re.search(r'(?i)gruppo\s*[bc]', corso) else '')
-            else:
-                tipo, lvl, anni = corso, '', anni_corso(corso)
-            if not data:
-                AVVISI.append(f'{ctx}: corso "{corso}" di {", ".join(nomi)} senza data — non importato'); continue
+        # ----- tabelle corsi (formato libero) -----
+        if re.search(r'(?i)legenda', (prime[ti] if ti < len(prime) else '')) or re.search(r'(?i)lavoratori (assunti|non)', ' '.join(' '.join(c) for r in rows for c in r)): continue
+        corso = ''; pend = []; prec = ''
+        def nodata(nomi, cr):
+            if nomi: AVVISI.append(f'{ctx}: corso "{cr}" di {", ".join(nomi)} senza data — non importato')
+        for ri, r in enumerate(rows):
+            txt = [' '.join(c) for c in r]
+            if norm(' '.join(txt)).startswith('dipendenti') or not norm(' '.join(txt)): continue
+            # celle ripetute dalle unioni di Word
+            vistec = []; cel = []
+            for j, c in enumerate(r):
+                if j and c == r[j - 1] and c: continue
+                cel.append(c)
+            ds = []; tc = []
+            for c in cel:
+                t = ' '.join(c)
+                if not t: continue
+                x = dte(t, f'{ctx} — {corso or txt[0]}')
+                if x: ds.append(x)
+                elif re.search(r'\d{1,2}[/.]\d{1,2}', t): continue
+                elif not re.fullmatch(r'(?i)(formazione|aggiornamento|nominativo|data|attestato)', norm(t)): tc.append(c)
+            def set_corso(t):
+                nonlocal corso, prec
+                t = clean(t)
+                if re.fullmatch(r'(?i)(liv(ello)?\.?\s*\w+|basso|medio|alto)', t) and prec: t = prec + ' ' + t
+                prec = re.sub(r'(?i)\s*(liv(ello)?\.?\s*\w+|basso|medio|alto)$', '', t) or prec
+                corso = t
+            if not ds:
+                if not tc: continue
+                first = ' '.join(tc[0])
+                if ri == 0 or e_corso(first):
+                    nodata(pend, corso); set_corso(first); pend = list(tc[1]) if len(tc) > 1 else []
+                else:
+                    nodata(tc[0], corso)
+                continue
+            if len(tc) >= 2: set_corso(' '.join(tc[0])); nomi = tc[1]
+            elif len(tc) == 1 and e_corso(' '.join(tc[0])) and pend: set_corso(' '.join(tc[0])); nomi = pend
+            elif len(tc) == 1: nomi = tc[0]
+            else: nomi = pend
+            if nomi is pend or all(p in nomi for p in pend): pend = []
+            if not corso: continue
             for n in nomi:
                 nota = ''; mm = re.search(r'\((.*?)\)', n)
                 if mm: nota = mm[1]; n = clean(n[:mm.start()])
-                R['for'].append(['@' + n, None, None, tipo, lvl, data, anni, nota])
+                n = clean(n.strip(' -–'))
+                if n: R['for'].append(['@' + n, None, None, corso, '', max(ds), None, nota])
+        nodata(pend, corso)
+
+    # classifica tutti i corsi trovati (tabelle e paragrafi)
+    for f in R['for']:
+        if str(f[0]).startswith('@'):
+            f[3], f[4], f[6] = classifica(f[3], az.get('settore', ''))
 
     # collega i nomi dei corsi ai dipendenti
     def chiave(n): return ' '.join(sorted(parole(n)))
@@ -330,7 +392,12 @@ def leggi(path):
             if len(simili) == 1:
                 AVVISI.append(f'{ctx}: "{n}" nel corso "{f[3]}" associato a {" ".join(idx[simili[0]][:2])} (nome scritto in modo diverso)')
                 k = simili[0]
-        if k in idx: f[0], f[1], f[2] = idx[k]
+        if k in idx:
+            f[0], f[1], f[2] = idx[k]
+            anno = re.search(r'\b(19|20)(\d\d)\b', f[7] or '')
+            if anno:   # omonimi: "CASILLO GIUSEPPE (1983)" -> anno di nascita nel codice fiscale
+                for a, b, cf, *_ in R['dip']:
+                    if chiave(a + ' ' + b) == k and cf[6:8] == anno[2]: f[0], f[1], f[2] = a, b, cf; f[7] = ''
         else:
             cog, nom = dividi(n)
             if set(parole(n)) == datore_n and datore_n: mans, nt = 'Amministratore', 'Datore di lavoro'

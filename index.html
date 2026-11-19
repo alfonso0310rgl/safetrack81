@@ -2256,7 +2256,7 @@ function elaboraExcel(wb,prova){
   const trovaDip=(c,cogn,nome,cf,crea)=>{
     c.dipendenti=c.dipendenti||[]; const CF=xTxt(cf).toUpperCase();
     let d=CF?c.dipendenti.find(x=>xTxt(x.codiceFiscale).toUpperCase()===CF):null;
-    if(!d&&cogn&&nome) d=c.dipendenti.find(x=>xNorm(x.cognome)===xNorm(cogn)&&xNorm(x.nome)===xNorm(nome));
+    if(!d&&cogn&&nome) d=c.dipendenti.find(x=>xNorm(x.cognome)===xNorm(cogn)&&xNorm(x.nome)===xNorm(nome)&&!(CF&&x.codiceFiscale&&xTxt(x.codiceFiscale).toUpperCase()!==CF));
     if(!d&&crea&&cogn&&nome){d={id:genId(),nome:xTxt(nome),cognome:xTxt(cogn),mansione:'',codiceFiscale:CF,dataAssunzione:'',attivo:true,note:''};c.dipendenti.push(d);cnt.dipN++;}
     return d;};
   const salta=(o,perche)=>avvisi.push(`• ${o._foglio} riga ${o._riga}: ${perche}`);
