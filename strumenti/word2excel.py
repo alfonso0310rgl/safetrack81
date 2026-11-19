@@ -98,6 +98,11 @@ def anni_corso(nome):
     if 'haccp' in n or 'alimentar' in n: return 3
     return 5
 
+def persona(n):
+    n0 = re.sub(r'\(.*?\)', '', n or '').strip()
+    if not n0 or len(n0.split()) > 6 or re.search(r'[;,:]', n0) or n0[:1].islower(): return False
+    if re.search(r'(?i)posture|vibraz|microclima|\bmmc\b|biologic|alcoo?l|rumore|\bvdt\b|rischio|chimic|polveri|videotermin|giubbino|scarpe|guanti|accordo|droga|s\.r\.l|srl|movimentaz', n0): return False
+    return True
 def e_corso(t):
     t = re.sub(r'\(.*?\)', '', t or '')
     return bool(re.search(r'(?i)antincend|soccorso|haccp|formaz|corso|addett|conduzion|conduttor|ponteg|carrell|trattor|\bgru\b|\bple\b|quota|\bdpi\b|responsabil|alimentar|attestat|escavat|muletti|elevator|movimento terra|^liv|^(basso|medio|alto)$', t))
@@ -149,7 +154,9 @@ def leggi(path):
     prep, rls = {}, {}
     medico = None; dvr = []
     ultimo = ''; consulente = False; assunz = {}; correzioni_cf = {}; att_rspp_altri = {}
+    in_visite = False
     for t in righe[1:]:
+        if re.match(r'(?i)^visite mediche', t): in_visite = True
         if re.search(r'(?i)consulente', t): consulente = True
         if '@' in t and not az.get('email') and not consulente and not ultimo:
             em = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', t)
@@ -241,6 +248,9 @@ def leggi(path):
             if data: R['doc'].append([clean(lab).capitalize() + (' — ' + nome if nome else ''), data, None, None, nota])
         elif nome and data:
             R['for'].append(['@' + nome, None, None, clean(lab), '', data, anni_corso(lab), nota])
+        elif nome and not in_visite and persona(nome) and e_corso(lab) and len(parole(nome)) >= 2 and not re.search(r'(?i)nomina|elezione|dvr|verbale', lab):
+            R['for'].append(['@' + nome, None, None, clean(lab), '', None, None, '; '.join(x for x in ('DATA DA INSERIRE', nota) if x)])
+            AVVISI.append(f'{ctx}: corso "{clean(lab)}" di {nome} senza data — inserito con la data da completare')
         elif data and len(lab) < 80:
             R['doc'].append([clean(lab), data, None, None, nota])
     # figure
@@ -354,6 +364,7 @@ def leggi(path):
                 if fd and dn and fd == dn:
                     AVVISI.append(f'{ctx}: {n} ha come data di formazione {fd:%d/%m/%Y} (coincide con la nascita?) — non importata'); fd = None
                 if fx and not fd: note.append('Formazione: ' + fx)
+                senza_f = bool(fx and not fd and re.search(r'[A-Za-z]', fx))
                 key = cf or norm(cog + nom)
                 if key in visti:
                     if not datore: dup_tab.append(n)
@@ -361,6 +372,7 @@ def leggi(path):
                 visti[key] = 1
                 R['dip'].append([cog, nom, cf, mans, dte(g(iDA)) or assunz.get(' '.join(sorted(parole(n)))), attivo, '; '.join(note)])
                 if fd: R['for'].append([cog, nom, cf, 'Formazione specifica', liv, fd, 5, ('Formazione lavoratori' + (' — ' + fx if fx else ''))])
+                elif senza_f: R['for'].append([cog, nom, cf, 'Formazione specifica', liv, None, 5, 'DATA DA INSERIRE; Formazione lavoratori — ' + fx])
                 vv = g(iV); vd = dte(vv)
                 if vd:
                     ma = re.search(r'(\d+)\s*ANN', vv.upper())
@@ -371,14 +383,24 @@ def leggi(path):
             continue
         # ----- tabelle corsi (formato libero) -----
         if len(tb.columns) == 1: continue
+        if re.search(r'(?i)visite mediche|rischi', (prime[ti] if ti < len(prime) else '')): continue
+        if len(re.findall(r'(?i)posture|vibrazion|microclima|\bmmc\b|biologic|alcoo?l|rumore|\bvdt\b|rischio terzi|polveri', ' '.join(p for r in rows for c in r for p in c))) >= 2: continue
         if rows and re.search(r'(?i)\brischi\b|\bfasi\b', ' '.join(' '.join(c) for c in rows[0])) and not dip_tab: continue
         if any(len(p) > 120 or re.search(r'(?i)visite mediche\s*:', p) for r in rows for c in r for p in c): continue
         if re.search(r'(?i)legenda', (prime[ti] if ti < len(prime) else '')) or re.search(r'(?i)lavoratori (assunti|non)', ' '.join(' '.join(c) for r in rows for c in r)): continue
         tutto = ' '.join(p for r in rows for c in r for p in c)
         if not dte(re.sub(r'\(.*?\)', '', tutto)) and not any(e_corso(' '.join(r[0])) for r in rows if r): continue
         corso = ''; pend = []
-        def nodata(nomi, cr):
-            if nomi: AVVISI.append(f'{ctx}: corso "{cr}" di {", ".join(nomi)} senza data — non importato')
+        def nodata(nomi, cr, stato=''):
+            if not nomi or not cr or len(cr) > 80: return
+            nomi = [n for n in nomi if persona(n)]
+            if not nomi: return
+            AVVISI.append(f'{ctx}: corso "{cr}" di {", ".join(nomi)} senza data — inserito con la data da completare')
+            for n in nomi:
+                nota = ''; mm = re.search(r'\((.*?)\)', n)
+                if mm: nota = mm[1]; n = clean(n[:mm.start()])
+                n = clean(n.strip(' -–'))
+                if n: R['for'].append(['@' + n, None, None, cr, '', None, None, '; '.join(x for x in ('DATA DA INSERIRE', stato, nota) if x)])
         for ri, r in enumerate(rows):
             txt = [' '.join(c) for c in r]
             if norm(' '.join(txt)).startswith('dipendenti') or not norm(' '.join(txt)): continue
@@ -409,7 +431,8 @@ def leggi(path):
                 if ri == 0 or e_corso(first):
                     nodata(pend, corso); set_corso(first); pend = list(tc[1]) if len(tc) > 1 else []
                 else:
-                    nodata(tc[0], corso)
+                    stato = ' '.join(' '.join(c) for c in cel if c and c is not tc[0] and re.match(r'(?i)^\(?\s*(in corso|fatto test|da fare|da chiudere|gi[aà].{0,2}lo tiene|test da chiudere|manca|non |da agg|online)', ' '.join(c)))
+                    nodata(tc[0], corso, stato)
                 continue
             if len(tc) >= 2: set_corso(' '.join(tc[0])); nomi = tc[1]
             elif len(tc) == 1 and e_corso(' '.join(tc[0])) and pend: set_corso(' '.join(tc[0])); nomi = pend
