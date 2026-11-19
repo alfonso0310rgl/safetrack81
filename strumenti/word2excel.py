@@ -120,7 +120,7 @@ def leggi(path):
     az = R['az']
     primo = righe[0]
     m = re.match(r'^(.*?)\s*-\s*\((.*)\)?$', primo)
-    az['nome'] = clean(m[1]) if m else primo
+    az['nome'] = (clean(m[1]) if m else primo).rstrip(' –-')
     ateco = [clean(m[2]).rstrip(')')] if m else []
     if not ateco:
         for t in righe[1:]:
@@ -280,7 +280,7 @@ def leggi(path):
             sede = ('Sede ' + pm[1].title()) if pm else ''
             col = lambda *ks: next((j for j, h in enumerate(head) for k in ks if h.startswith(k)), None)
             iN = col('nominativ'); iCF = col('codic'); iDN = col('datadinascita'); iLN = col('luogodinascita', 'logodinascita')
-            iDA = col('dataassunzione'); iM = col('mansione'); iF = col('form'); iI = col('inform'); iD = col('dpi'); iV = col('visit')
+            iDA = col('dataassunzione', 'datainizio'); iM = col('mansione'); iF = col('form'); iI = col('inform'); iD = col('dpi'); iV = col('visit')
             liv = rischio(' '.join(head[iF:iF + 1])) if iF is not None else ''
             liv = liv or liv_ateco or 'Rischio alto'
             for k in range(inizio, len(rows)):
