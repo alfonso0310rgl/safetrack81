@@ -164,6 +164,7 @@ def leggi(path):
         # nome – data – note
         mm = re.match(r'^(.*?)\s*(?:–|—|\s-\s|-\s*$|-(?=\s*\d))\s*(.*)$', rest)
         nome, coda = (clean(mm[1]), mm[2]) if mm else (re.sub(r'\(.*?\)', '', resto_testo(rest)).strip(), re.sub(r'^[^(]*', '', rest) if not dte(rest) else rest)
+        nome = re.sub(r'(?i)\s+(attestato|att\.)\b.*$', '', nome or '').strip()
         if re.fullmatch(r'\(.*\)|', nome or '') or re.match(r'(?i)^(da fare|da nominare|da aprire|no\b|in corso)', nome or ''): nome = ''
         data = dte(coda, f'{ctx} — {clean(lab)}')
         nota = resto_testo(coda).strip('() ')
@@ -383,6 +384,8 @@ def leggi(path):
                 nota = ''; mm = re.search(r'\((.*?)\)', n)
                 if mm: nota = mm[1]; n = clean(n[:mm.start()])
                 n = clean(n.strip(' -–'))
+                ml = re.match(r'^(.*\S)\s+(ELEVATO|MEDIO|BASSO|ALTO)$', n)
+                if ml and len(ml[1].split()) >= 2: n = ml[1]; nota = (nota + ' ' + ml[2].lower()).strip()
                 if n: R['for'].append(['@' + n, None, None, corso, '', max(ds), None, nota])
         nodata(pend, corso)
 
@@ -455,7 +458,7 @@ def scrivi(out, docs):
     for R in letti:
         a = R['az']
         if nomi2.count(a['nome']) > 1:
-            via = clean(re.split(r'\s+[-–]\s+\d{5}', a.get('so', ''))[0])
+            via = clean(re.split(r'\s*[-–]\s*\d{5}', a.get('so', ''))[0])
             if via: a['nome'] = f"{a['nome'].split(' - ')[0]} - {via}"
         N = a['nome']
         put('Aziende', [N, a.get('piva'), a.get('settore'), a.get('email'), a.get('ref'), a.get('sl'), a.get('so'), None])
