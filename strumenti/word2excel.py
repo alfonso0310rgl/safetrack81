@@ -110,6 +110,20 @@ def classifica(corso, settore=''):
         return 'Primo soccorso', lvl, 3
     return clean(re.sub(r'(?i)^att\.?\s*', '', corso)), '', anni_corso(corso)
 
+def voce_figura(diz, nome):
+    """stessa persona scritta con o senza note tra parentesi -> una sola voce; omonimi con date di nascita diverse restano separati"""
+    base = norm(re.sub(r'\(.*?\)', '', nome)); par = ' '.join(re.findall(r'\((.*?)\)', nome))
+    dpar = dte(par)
+    for k, v in diz.items():
+        if v['base'] != base: continue
+        if dpar and v['dnasc'] and v['dnasc'] != dpar: continue
+        if dpar and not v['dnasc']: v['dnasc'] = dpar; v['nome'] = nome
+        if par and not dpar and par not in v['note']: v['note'].append(par)
+        return v
+    v = {'nome': nome if dpar else clean(re.sub(r'\(.*?\)', '', nome)), 'nom': None, 'att': [], 'note': [par] if par and not dpar else [], 'base': base, 'dnasc': dpar}
+    diz[norm(nome)] = v
+    return v
+
 # ---------------- lettura di un Word ----------------
 def leggi(path):
     d = docx.Document(path)
@@ -196,13 +210,13 @@ def leggi(path):
                 elif nota: rspp['note'].append('Attestato: ' + nota)
         elif 'preposto' in L:
             if not nome: continue
-            p = prep.setdefault(norm(nome), {'nome': nome, 'nom': None, 'att': [], 'note': []})
+            p = voce_figura(prep, nome)
             if not L.startswith(('att', 'agg')): p['nom'] = data or p['nom']
             elif data: p['att'].append(data)
             if nota: p['note'].append(nota)
         elif 'rls' in L:
             if not nome: continue
-            r = rls.setdefault(norm(nome), {'nome': nome, 'nom': None, 'att': [], 'note': []})
+            r = voce_figura(rls, nome)
             if not L.startswith(('att', 'agg')): r['nom'] = data
             elif data: r['att'].append(data)
             if nota and not data: r['note'].append(('Attestato: ' if L.startswith(('att', 'agg')) else 'Elezione: ') + nota)
@@ -216,6 +230,8 @@ def leggi(path):
             if data: R['doc'].append(['Verbale Riunione Periodica', data, None, None, nota])
         elif 'evacuazione' in L:
             if data: R['doc'].append(['Verbale Prova Evacuazione', data, None, None, nota])
+        elif re.match(r'(?i)^(il|la|i|le)\s+dipend', lab):
+            AVVISI.append(f'{ctx}: nota nel Word — {t}'); continue
         elif L.startswith('visit') or L.startswith('macchinari') or L.startswith('note'):
             continue
         elif L.startswith('nomina'):
@@ -229,7 +245,8 @@ def leggi(path):
         att = max(rspp['att']) if rspp['att'] else None
         R['fig'].append(['RSPP', rspp['nome'], rspp['nom'], att, 5 if att else None, '; '.join(rspp['note'])])
     for k0, ds0 in att_rspp_altri.items():
-        if k0 in prep: prep[k0]['att'] += ds0
+        hit = [v for v in prep.values() if v['base'] == norm(re.sub(r'\(.*?\)', '', k0))]
+        if hit: hit[0]['att'] += ds0
         else: AVVISI.append(f'{ctx}: attestato RSPP di {k0.upper()} non collegato: la persona non è né RSPP né preposto — non importato')
     for p in prep.values():
         att = max(p['att']) if p['att'] else None
@@ -296,6 +313,7 @@ def leggi(path):
                 g = lambda j: (' '.join(r[j]) if j is not None and j < len(r) else '')
                 n = clean(g(iN))
                 if not n or norm(n).startswith('nominativ'): continue
+                tag = ' '.join(re.findall(r'\((.*?)\)', n)); n = clean(re.sub(r'\(.*?\)', '', n))
                 cf = re.sub(r'\s', '', g(iCF)).upper(); cf = correzioni_cf.get(cf, cf)
                 cog, nom = dividi(n, cf)
                 dn0 = dte(g(iDN))
@@ -327,6 +345,7 @@ def leggi(path):
                 for c in tutti:
                     if c in legenda and legenda[c] not in note: note.append(legenda[c])
                 if sede and sede not in note: note.append(sede)
+                if tag: note.append(tag)
                 fv = g(iF); fd = dte(fv, f'{ctx} — formazione {n}'); fx = resto_testo(fv).strip('/- ')
                 if fd and dn and fd == dn:
                     AVVISI.append(f'{ctx}: {n} ha come data di formazione {fd:%d/%m/%Y} (coincide con la nascita?) — non importata'); fd = None
