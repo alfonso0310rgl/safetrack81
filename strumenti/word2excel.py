@@ -12,7 +12,7 @@ TPL = '/home/claude/safetrack81/modello_importazione.xlsx'
 # ---------------- utilità ----------------
 def clean(s): return re.sub(r'\s+', ' ', (s or '').replace('\xa0', ' ').replace('*', '')).strip()
 def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFD', (s or '').lower()).encode('ascii', 'ignore').decode())
-def parole(s): return [unicodedata.normalize('NFD', w.upper()).encode('ascii', 'ignore').decode() for w in clean(s).split()]
+def parole(s): return [unicodedata.normalize('NFD', w.upper().replace('’', "'").replace('`', "'")).encode('ascii', 'ignore').decode() for w in clean(s).split()]
 
 AVVISI = []
 def dte(s, ctx=''):
@@ -115,6 +115,8 @@ def leggi(path):
     d = docx.Document(path)
     R = {'az': {}, 'dip': [], 'fig': [], 'doc': [], 'for': [], 'ido': []}
     righe = [clean(p.text) for p in d.paragraphs if clean(p.text)]
+    p0 = next((p.text for p in d.paragraphs if clean(p.text)), '')
+    if re.search(r'\*{2,}\s*[^*]+\*{2,}', p0): righe[0] = clean(re.sub(r'\*{2,}\s*([^*]+?)\s*\*{2,}', r' - \1', p0))
     az = R['az']
     primo = righe[0]
     m = re.match(r'^(.*?)\s*-\s*\((.*)\)?$', primo)
@@ -260,7 +262,7 @@ def leggi(path):
                 if re.search(r'(?i)non assunt', txt):
                     for col in cols: legenda[col] = 'Non assunto (solo visita medica)'
             elif re.search(r'(?i)amministrator|datore', txt): col_dat |= cols
-    visti = {}
+    visti = {}; prec = ''
     datore_n = set(parole(az.get('datore', '')))
     liv_ateco = rischio(az.get('settore', ''))
     head_prec = None
@@ -334,7 +336,9 @@ def leggi(path):
         # ----- tabelle corsi (formato libero) -----
         if any(len(p) > 120 or re.search(r'(?i)visite mediche\s*:', p) for r in rows for c in r for p in c): continue
         if re.search(r'(?i)legenda', (prime[ti] if ti < len(prime) else '')) or re.search(r'(?i)lavoratori (assunti|non)', ' '.join(' '.join(c) for r in rows for c in r)): continue
-        corso = ''; pend = []; prec = ''
+        tutto = ' '.join(p for r in rows for c in r for p in c)
+        if not dte(re.sub(r'\(.*?\)', '', tutto)) and not any(e_corso(' '.join(r[0])) for r in rows if r): continue
+        corso = ''; pend = []
         def nodata(nomi, cr):
             if nomi: AVVISI.append(f'{ctx}: corso "{cr}" di {", ".join(nomi)} senza data — non importato')
         for ri, r in enumerate(rows):
@@ -349,9 +353,9 @@ def leggi(path):
             for c in cel:
                 t = ' '.join(c)
                 if not t: continue
-                x = dte(t, f'{ctx} — {corso or txt[0]}')
+                x = dte(re.sub(r'\(.*?\)', '', t), f'{ctx} — {corso or txt[0]}')
                 if x: ds.append(x)
-                elif re.search(r'\d{1,2}[/.]\d{1,2}', t): continue
+                elif re.search(r'\d{1,2}[/.]\d{1,2}', re.sub(r'\(.*?\)', '', t)): continue
                 elif re.fullmatch(r'(formazione|aggiornament\w*|aggformazione|nominativo|nome|data|attestato)', norm(t)): continue
                 elif re.match(r'(?i)^\(?\s*(in corso|fatto test|da fare|da chiudere|gi[aà].{0,2}lo tiene|test da chiudere|manca|non |da agg|online)', t): continue
                 else: tc.append(c)
