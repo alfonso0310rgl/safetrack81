@@ -9,6 +9,26 @@ def dte(s):
     m=re.search(DATE,s); return dt.date(int(m[3]),int(m[2]),int(m[1])) if m else None
 def norm(s): return re.sub(r'[^a-z0-9]','',unicodedata.normalize('NFD',s.lower()).encode('ascii','ignore').decode())
 def clean(s): return re.sub(r'\s+',' ',(s or '').replace('\xa0',' ')).strip()
+from docx.oxml.ns import qn
+def colori(cell):
+    """colori di sfondo/evidenziazione/testo di una cella, come esadecimali RRGGBB"""
+    out=set(); tcPr=cell._tc.tcPr
+    if tcPr is not None:
+        sh=tcPr.find(qn('w:shd'))
+        if sh is not None and sh.get(qn('w:fill')) not in (None,'auto'): out.add(sh.get(qn('w:fill')).upper())
+    HL={'YELLOW':'FFFF00','RED':'FF0000','DARK_RED':'C00000'}
+    for p in cell.paragraphs:
+        for r in p.runs:
+            if r.font.highlight_color is not None: out.add(HL.get(str(r.font.highlight_color).split('.')[-1].split(' ')[0],'XX'))
+            rp=r._r.rPr
+            if rp is not None and rp.find(qn('w:shd')) is not None:
+                f=rp.find(qn('w:shd')).get(qn('w:fill'))
+                if f and f!='auto': out.add(f.upper())
+            if r.font.color is not None and r.font.color.type is not None and r.font.color.rgb is not None: out.add('T'+str(r.font.color.rgb).upper())
+    return out
+def _rgb(h): h=h.lstrip('T'); return (int(h[0:2],16),int(h[2:4],16),int(h[4:6],16)) if re.fullmatch(r'[0-9A-F]{6}',h) else None
+def rosso(c): x=_rgb(c); return bool(x) and x[0]>=0xB0 and x[1]<0x60 and x[2]<0x60
+def giallo(c): x=_rgb(c); return bool(x) and not c.startswith('T') and x[0]>=0xE0 and x[1]>=0xE0 and x[2]<0xA0
 def leggi(path,avvisi):
     d=docx.Document(path); R={'az':{},'dip':[],'fig':[],'doc':[],'for':[],'ido':[]}
     righe=[clean(p.text) for p in d.paragraphs if clean(p.text)]
@@ -39,7 +59,16 @@ def leggi(path,avvisi):
     for p in prep.values(): R['fig'].append(['Preposto',p['nome'],p['nom'],p['att'],2])
     for r in rls.values(): R['fig'].append(['RLS',r['nome'],r['nom'],r['att'],1])
     if dvr:
-        data,rev=max(dvr,key=lambda x:x[0] or dt.date.min); R['doc'].insert(0,['DVR',data,None,rev])
+        data,rev=max(dvr,key=lambda x:x[0] or dt.date.min); R['doc'].insert(0,['DVR',data,4,rev])
+    legenda={}
+    for t in d.tables:
+        for r in t.rows:
+            cs=r.cells; txt=clean(' '.join(c.text for c in cs))
+            m=re.match(r'(?i)^dipendenti\s+(.+?):?$',txt)
+            if m:
+                for c in cs:
+                    for col in colori(c):
+                        if _rgb(col) and not rosso(col) and not giallo(col): legenda[col]='Sede '+m[1].strip(' :').title()
     for t in d.tables:
         rows=[[ [clean(p.text) for p in c.paragraphs if clean(p.text)] for c in r.cells] for r in t.rows]
         head=[norm(' '.join(c)) for c in rows[0]]
@@ -57,7 +86,16 @@ def leggi(path,avvisi):
                 if g(r,iDN) or g(r,iLN): note.append('Nato il '+clean(g(r,iDN))+(' a '+clean(g(r,iLN)) if g(r,iLN) else ''))
                 if dte(g(r,iI)): note.append('Informazione: '+clean(g(r,iI)))
                 if dte(g(r,iD)): note.append('Consegna DPI: '+clean(g(r,iD)))
-                R['dip'].append([cog,nom,cf,clean(g(r,iM)),dte(g(r,iDA)),'SI','; '.join(note)])
+                rc=t.rows[rows.index(r)].cells; cl=colori(rc[iN]) if iN is not None else set()
+                tutti=set().union(*[colori(c) for c in rc])
+                attivo='NO' if any(rosso(c) for c in cl) else 'SI'
+                datore=any(giallo(c) for c in tutti)
+                mans='Amministratore' if datore else clean(g(r,iM))
+                if datore and clean(g(r,iM)) and norm(g(r,iM))!='amministratore': note.insert(0,'Datore di lavoro — '+clean(g(r,iM)))
+                elif datore: note.insert(0,'Datore di lavoro')
+                for c in tutti:
+                    if c in legenda and legenda[c] not in note: note.append(legenda[c])
+                R['dip'].append([cog,nom,cf,mans,dte(g(r,iDA)),attivo,'; '.join(note)])
                 if dte(g(r,iF)): R['for'].append([cog,nom,cf,'Formazione specifica','Rischio alto',dte(g(r,iF)),5,'Formazione lavoratori (generale + specifica)'])
         elif len(rows[0])>=3:
             for r in rows:

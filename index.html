@@ -1305,7 +1305,7 @@ function saveEditRecord(spec){
 function mDVR(){const c=getCompany();const r=c.dvr||{};return`<button class="mc" onclick="closeModal()">✕</button>
   <h3>📁 DVR — Documento di Valutazione dei Rischi</h3>
   <div class="fr"><div><label>Data Redazione</label><input type="date" id="f_data" value="${r.dataRedazione||''}" oninput="calcScad('f_data','f_anni','f_scad')"></div><div><label>Revisione N°</label><input type="text" id="f_rev" value="${r.revisione||''}" placeholder="es. Rev. 3"></div></div>
-  <div class="fr"><div><label>Scadenza / Prossima Revisione</label><input type="date" id="f_scad" value="${r.scadenza||''}"></div><div><label>Anni Validità</label><input type="number" id="f_anni" min="1" max="10" value="${r.anniValidita||3}" onchange="calcScad('f_data','f_anni','f_scad')"></div></div>
+  <div class="fr"><div><label>Scadenza / Prossima Revisione</label><input type="date" id="f_scad" value="${r.scadenza||''}"></div><div><label>Anni Validità</label><input type="number" id="f_anni" min="1" max="10" value="${r.anniValidita||4}" onchange="calcScad('f_data','f_anni','f_scad')"></div></div>
   <div class="info-hint">Inserisci data redazione + anni → scadenza calcolata automaticamente.</div>
   <div class="fg"><label>Note</label><textarea id="f_note" rows="2" style="resize:vertical;">${r.note||''}</textarea></div>
   <div class="fa"><button class="btn btn-secondary" onclick="closeModal()">Annulla</button><button class="btn btn-primary" onclick="saveDVR()">Salva</button></div>`;}
@@ -2289,7 +2289,7 @@ function elaboraExcel(wb,prova){
   xFoglio(wb,'document').forEach(o=>{const az=xCol(o,'azienda');if(!xTxt(az)||esempio(az))return;
     const nome=xTxt(xCol(o,'documento'));if(!nome){salta(o,'manca il nome del documento');return;}
     const c=trovaAz(az,'',true),k=(DOCK.find(([re])=>re.test(xNorm(nome)))||[])[1];
-    const data=xData(xCol(o,'data')),s=xScad(data,xAnni(xCol(o,'anni')),xData(xCol(o,'scadenza')),data?(k==='dvr'?3:1):''),note=xTxt(xCol(o,'note'));
+    const data=xData(xCol(o,'data')),s=xScad(data,xAnni(xCol(o,'anni')),xData(xCol(o,'scadenza')),data?(k==='dvr'?4:1):''),note=xTxt(xCol(o,'note'));
     if(k==='dvr'){c.dvr=c.dvr||{};set(c.dvr,'dataRedazione',data);set(c.dvr,'revisione',xTxt(xCol(o,'revisione')));set(c.dvr,'anniValidita',s.anni);set(c.dvr,'scadenza',s.scad);set(c.dvr,'note',note);}
     else if(k){c[k]=c[k]||{};set(c[k],'data',data);set(c[k],'anniValidita',s.anni);set(c[k],'scadenza',s.scad);set(c[k],'note',note);}
     else{c.altriDocumenti=c.altriDocumenti||[];let r=c.altriDocumenti.find(x=>xNorm(x.nome)===xNorm(nome)&&(x.data||'')===data);
