@@ -40,7 +40,7 @@ def _cf_nom(s):
 def dividi(nome, cf=''):
     """(cognome, nome) usando il codice fiscale quando possibile; altrimenti ultima parola = nome"""
     orig = clean(nome).split(); w = parole(nome)
-    if len(w) < 2: return clean(nome), ''
+    if len(w) < 2: return clean(nome), '(da completare)'
     cf = (cf or '').upper()
     if re.fullmatch(r'[A-Z]{6}.*', cf):
         for i in range(1, len(w)):
@@ -90,6 +90,7 @@ def rischio(t):
 def anni_corso(nome):
     n = norm(nome)
     if 'ponteggi' in n: return 4
+    if 'haccp' in n or 'alimentar' in n: return 3
     return 5
 
 # ---------------- lettura di un Word ----------------
@@ -102,26 +103,39 @@ def leggi(path):
     m = re.match(r'^(.*?)\s*-\s*\((.*)\)?$', primo)
     az['nome'] = clean(m[1]) if m else primo
     ateco = [clean(m[2]).rstrip(')')] if m else []
-    i = 1
     if not ateco:
-        while i < len(righe) and (righe[i].startswith('(') or (ateco and not ateco[-1].endswith(')') and ':' not in righe[i][:25])):
-            ateco.append(righe[i]); i += 1
-            if righe[i - 1].endswith(')'): break
-    az['settore'] = re.sub(r'^\(|\)$', '', ' '.join(ateco)).replace('Codice ATECO: ', '').strip()
+        for t in righe[1:]:
+            if re.match(r'(?i)^(sede|partita|p\.?\s*iva|codice fiscale|amministrat|datore|mail)', t): break
+            ateco.append(t)
+    az['settore'] = re.sub(r'[()]', '', ' '.join(ateco)).replace('Codice ATECO: ', '').replace('Codice: ', '').strip()
     ctx = az['nome']
     rspp = {'nome': '', 'nom': None, 'att': [], 'note': []}
     prep, rls = {}, {}
     medico = None; dvr = []
+    ultimo = ''; consulente = False; assunz = {}
     for t in righe[1:]:
-        if '@' in t and not az.get('email'):
+        if re.search(r'(?i)consulente', t): consulente = True
+        if '@' in t and not az.get('email') and not consulente:
             em = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', t)
             if em: az['email'] = em[0]
+        if '@' not in t and not re.search(r'(?i)consulente', t) and not t.startswith('michela'): consulente = consulente and '@' in t
+        ma = re.match(r'(?i)^data di assunzione\s+(.+?)\s*:\s*(.*)$', t)
+        if ma:
+            if dte(ma[2]): assunz[' '.join(sorted(parole(ma[1])))] = dte(ma[2])
+            continue
+        mx = re.match(r'(?i)^(att\.?(?:\s*agg\.?)?)\s*[-–]\s*(.*)$', t)
+        if mx and ':' not in t: t = mx[1] + ' ' + ultimo + ': ' + mx[2]
         lab, sep, rest = t.partition(':')
-        if not sep: continue
-        L = norm(lab); rest = clean(rest)
+        if not sep:
+            lab, sep, rest = t.partition(' – ')
+            if not sep or not dte(rest): continue
+        L = norm(lab); rest = clean(rest).rstrip(':').strip()
+        if L in ('att', 'attagg') and ultimo: L = L + ultimo; lab = lab + ' ' + ultimo
+        for ruolo in ('rspp', 'preposto', 'rls', 'medicocompetente'):
+            if ruolo in L: ultimo = ruolo
         # nome – data – note
         mm = re.match(r'^(.*?)\s*(?:–|—|\s-\s|-\s*$|-(?=\s*\d))\s*(.*)$', rest)
-        nome, coda = (clean(mm[1]), mm[2]) if mm else (re.sub(r'\(.*?\)', '', resto_testo(rest)).strip(), rest)
+        nome, coda = (clean(mm[1]), mm[2]) if mm else (re.sub(r'\(.*?\)', '', resto_testo(rest)).strip(), re.sub(r'^[^(]*', '', rest) if not dte(rest) else rest)
         if re.fullmatch(r'\(.*\)|', nome or ''): nome = ''
         data = dte(coda, f'{ctx} — {clean(lab)}')
         nota = resto_testo(coda).strip('() ')
@@ -135,10 +149,10 @@ def leggi(path):
             extra = re.sub(r'^sedeoperativa', '', L)
             val = (clean(lab.split('Operativa', 1)[-1]) + ': ' if extra else '') + rest
             az['so'] = (az['so'] + ' / ' + val) if az.get('so') else val
-        elif L.startswith('amministrat') or L.startswith('datoredilavoro'):
-            az['ref'] = ('Datore di lavoro: ' if 'datore' in L else 'Amministratore: ') + rest; az['datore'] = rest
+        elif (L.startswith('amministrat') or L.startswith('datoredilavoro')) and not az.get('ref'):
+            az['ref'] = ('Datore di lavoro: ' if 'datore' in L else 'Amministratore: ') + rest; az['datore'] = re.sub(r'\(.*?\)', '', rest).strip()
         elif 'rspp' in L:
-            if L.startswith('nomina') or L.startswith('autonomina'):
+            if not L.startswith('att'):
                 rspp['nome'] = nome or rspp['nome']; rspp['nom'] = data
                 if nota: rspp['note'].append('Nomina: ' + nota)
             else:
@@ -148,15 +162,15 @@ def leggi(path):
         elif 'preposto' in L:
             if not nome: continue
             p = prep.setdefault(norm(nome), {'nome': nome, 'nom': None, 'att': [], 'note': []})
-            if L.startswith('nomina') or L.startswith('autonomina'): p['nom'] = data or p['nom']
+            if not L.startswith('att'): p['nom'] = data or p['nom']
             elif data: p['att'].append(data)
             if nota: p['note'].append(nota)
         elif 'rls' in L:
             if not nome: continue
             r = rls.setdefault(norm(nome), {'nome': nome, 'nom': None, 'att': [], 'note': []})
-            if L.startswith('elezione'): r['nom'] = data
+            if not L.startswith('att'): r['nom'] = data
             elif data: r['att'].append(data)
-            if nota and not data: r['note'].append(('Elezione: ' if L.startswith('elezione') else 'Attestato: ') + nota)
+            if nota and not data: r['note'].append(('Attestato: ' if L.startswith('att') else 'Elezione: ') + nota)
         elif 'medicocompetente' in L:
             medico = [nome or rest, data, nota]
         elif L.startswith('dvr'):
@@ -200,25 +214,29 @@ def leggi(path):
                 for c in r.cells:
                     for col in colori(c):
                         if _rgb(col) and not rosso(col) and not giallo(col): legenda[col] = 'Sede ' + mL[1].strip(' :').title()
+    visti = {}
     datore_n = set(parole(az.get('datore', '')))
     liv_ateco = rischio(az.get('settore', ''))
     for tb in d.tables:
         rows = [[[clean(p.text) for p in c.paragraphs if clean(p.text)] for c in r.cells] for r in tb.rows]
         if not rows: continue
         head = [norm(' '.join(c)) for c in rows[0]]
-        if any('nominativo' in h for h in head):
+        if any(h.startswith('nominativ') for h in head):
             col = lambda *ks: next((j for j, h in enumerate(head) for k in ks if h.startswith(k)), None)
-            iN = col('nominativo'); iCF = col('codic'); iDN = col('datadinascita'); iLN = col('luogodinascita', 'logodinascita')
+            iN = col('nominativ'); iCF = col('codic'); iDN = col('datadinascita'); iLN = col('luogodinascita', 'logodinascita')
             iDA = col('dataassunzione'); iM = col('mansione'); iF = col('form'); iI = col('inform'); iD = col('dpi'); iV = col('visit')
             liv = rischio(' '.join(rows[0][iF])) if iF is not None else ''
             liv = liv or liv_ateco or 'Rischio alto'
-            visti = {}
             for k, r in enumerate(rows[1:], 1):
                 g = lambda j: (' '.join(r[j]) if j is not None and j < len(r) else '')
                 n = clean(g(iN))
-                if not n or norm(n) in ('nominativo',): continue
+                if not n or norm(n).startswith('nominativ'): continue
                 cf = re.sub(r'\s', '', g(iCF)).upper()
                 cog, nom = dividi(n, cf)
+                dn0 = dte(g(iDN))
+                if dn0 and re.fullmatch(r'[A-Z]{6}\d{2}.*', cf) and cf[6:8] != dn0.strftime('%y'):
+                    AVVISI.append(f'{ctx}: {n} — la data di nascita {dn0:%d/%m/%Y} non corrisponde al codice fiscale ({cf})')
+                if len(parole(n)) < 2: AVVISI.append(f'{ctx}: dipendente "{n}" senza cognome/nome completo — inserito come "{n} (da completare)"')
                 if cf and not re.fullmatch(r'[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]', cf):
                     AVVISI.append(f'{ctx}: codice fiscale da controllare per {n} ({cf})')
                 cells = tb.rows[k].cells
@@ -242,15 +260,16 @@ def leggi(path):
                     if c in legenda and legenda[c] not in note: note.append(legenda[c])
                 # formazione lavoratori
                 fv = g(iF); fd = dte(fv, f'{ctx} — formazione {n}'); fx = resto_testo(fv).strip('/- ')
-                if fd and dn and fd <= dn.replace(year=dn.year + 14):
+                if fd and dn and fd == dn:
                     AVVISI.append(f'{ctx}: {n} ha come data di formazione {fd:%d/%m/%Y} (coincide con la nascita?) — non importata'); fd = None
                 if fx and not fd: note.append('Formazione: ' + fx)
                 if attivo == 'NO' and fx and fd: note.append(fx)
                 key = cf or norm(cog + nom)
                 if key in visti:
-                    AVVISI.append(f'{ctx}: {n} compare due volte nell\'elenco dipendenti — tenuto una volta'); continue
+                    if not datore: AVVISI.append(f'{ctx}: {n} compare due volte nell\'elenco dipendenti — tenuto una volta')
+                    continue
                 visti[key] = 1
-                R['dip'].append([cog, nom, cf, mans, dte(g(iDA)), attivo, '; '.join(note)])
+                R['dip'].append([cog, nom, cf, mans, dte(g(iDA)) or assunz.get(' '.join(sorted(parole(n)))), attivo, '; '.join(note)])
                 if fd: R['for'].append([cog, nom, cf, 'Formazione specifica', liv, fd, 5, ('Formazione lavoratori' + (' — ' + fx if fx else ''))])
                 vv = g(iV); vd = dte(vv)
                 if vd:
@@ -266,16 +285,19 @@ def leggi(path):
                 ds = [x for x in (dte(' '.join(c), f'{ctx} — {corso}') for c in r[1:]) if x]
                 if not nomi: continue
                 if not ds: AVVISI.append(f'{ctx}: corso "{corso}" di {", ".join(nomi)} senza data — non importato'); continue
-                for n in nomi: R['for'].append(['@' + n, None, None, corso, '', max(ds), anni_corso(corso), ''])
+                for n in nomi:
+                    nota = ''; mm = re.search(r'\((.*?)\)', n)
+                    if mm: nota = mm[1]; n = clean(n[:mm.start()])
+                    R['for'].append(['@' + n, None, None, corso, '', max(ds), anni_corso(corso), nota])
             continue
         prec = ''
         for r in rows:
             if len(r) < 3: continue
-            corso = clean(' '.join(r[0])); nomi = r[1]; dtxt = ' '.join(r[2])
+            corso = clean(' '.join(r[0])); nomi = r[1]; dtxt = ' '.join(' '.join(c) for c in r[2:])
             if re.fullmatch(r'(?i)(liv\.?\s*\w+|basso|medio|alto)', corso) and prec: corso = prec + ' ' + corso
             prec = re.sub(r'(?i)\s*(liv(ello)?\.?\s*\w+|basso|medio|alto)$', '', corso) or prec
             if not nomi or norm(corso).startswith('dipendenti'): continue
-            data = dte(dtxt, f'{ctx} — {corso}')
+            ds = [x for x in (dte(' '.join(c), f'{ctx} — {corso}') for c in r[2:]) if x]; data = max(ds) if ds else None
             c = norm(corso)
             if 'antincendio' in c or c in ('basso', 'medio', 'alto'):
                 tipo, lvl, anni = 'Antincendio', livello_antincendio(corso), 5
@@ -304,7 +326,7 @@ def leggi(path):
                 if len(A) != len(B): return False
                 diff = [(x, y) for x, y in zip(A, B) if x != y]
                 return len(diff) == 1 and abs(len(diff[0][0]) - len(diff[0][1])) <= 1 and difflib.SequenceMatcher(None, *diff[0]).ratio() >= 0.75
-            simili = [x for x in idx if quasi(k, x)]
+            simili = [x for x in idx if quasi(k, x)] or [x for x in idx if len(k.split()) >= 2 and set(k.split()) < set(x.split())]
             if len(simili) == 1:
                 AVVISI.append(f'{ctx}: "{n}" nel corso "{f[3]}" associato a {" ".join(idx[simili[0]][:2])} (nome scritto in modo diverso)')
                 k = simili[0]
