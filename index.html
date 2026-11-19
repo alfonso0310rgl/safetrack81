@@ -402,6 +402,11 @@
     <div id="datiPage" style="display:none;" class="content">
       <div class="page-head"><div><div class="page-title">Importa / Esporta</div><div class="page-sub">Backup e trasferimento dei dati del gestionale</div></div></div>
       <div class="dati-grid">
+        <div class="card"><div class="dati-ico">📊</div><div class="dati-t">Importa da Excel</div>
+          <div class="dati-d">Scarica il <strong>modello Excel</strong>, compila aziende, dipendenti, figure, documenti, formazione e idoneità, poi caricalo qui: dati e scadenze entrano in automatico. Nessun dato esistente viene cancellato.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;"><a class="btn btn-secondary" style="text-decoration:none;" href="modello_importazione.xlsx" download>⬇️ Scarica modello</a>
+          <button class="btn btn-primary" id="btnImportaXls" onclick="document.getElementById('importXls').click()">📊 Importa file Excel</button></div>
+          <input type="file" id="importXls" accept=".xlsx,.xls,.xlsm" style="display:none;" onchange="importaExcel(event)"></div>
         <div class="card"><div class="dati-ico">📤</div><div class="dati-t">Importa backup</div>
           <div class="dati-d">Carica un file <strong>.json</strong> creato con "Esporta" o un backup giornaliero. Le aziende con lo stesso codice vengono aggiornate, le nuove aggiunte. Nessuna azienda viene eliminata.</div>
           <button class="btn btn-primary" id="btnImporta" onclick="document.getElementById('importFile').click()">📤 Scegli file da importare</button>
@@ -2186,6 +2191,142 @@ function importaBackup(event) {
   reader.readAsText(file);
   // Reset input per permettere di ricaricare lo stesso file
   event.target.value = '';
+}
+
+// ===== IMPORTA DA EXCEL (modello_importazione.xlsx) =====
+function caricaSheetJS(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((ok,ko)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=ok;s.onerror=()=>ko(new Error('Impossibile caricare il lettore Excel. Controlla la connessione.'));document.head.appendChild(s);});
+}
+function xNorm(t){return normTxt(t).replace(/[*().\/]/g,' ').replace(/\s+/g,' ').trim();}
+function xData(x){
+  if(x===''||x==null) return '';
+  if(typeof x==='number'){ if(x<1000) return ''; return new Date(Math.round((x-25569)*86400000)).toISOString().slice(0,10); }
+  if(x instanceof Date) return isNaN(x)?'':x.toISOString().slice(0,10);
+  const s=String(x).trim(); let m;
+  if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  if(m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/)){let y=m[3];if(y.length===2)y='20'+y;return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;}
+  return '';
+}
+function xTxt(x){return x==null?'':String(x).trim();}
+function xAnni(x){const n=parseFloat(String(x).replace(',','.'));return n>0?String(n):'';}
+function xFoglio(wb,chiave){const n=wb.SheetNames.find(s=>xNorm(s).startsWith(chiave));if(!n)return [];
+  const ws=wb.Sheets[n];if(!ws['!ref'])return [];const R=XLSX.utils.decode_range(ws['!ref']);
+  const val=(r,c)=>{const x=ws[XLSX.utils.encode_cell({r,c})];return !x||x.f?'':(x.v==null?'':x.v);}; // le formule le ricalcola il gestionale
+  const head=[];for(let c=R.s.c;c<=R.e.c;c++)head.push(xNorm(val(R.s.r,c)));
+  const out=[];for(let r=R.s.r+1;r<=R.e.r;r++){const o={_riga:r+1,_foglio:n};let pieno=false;
+    head.forEach((h,j)=>{if(!h)return;const v=val(r,R.s.c+j);o[h]=v;if(v!=='')pieno=true;});if(pieno)out.push(o);}
+  return out;}
+function xCol(o,...chiavi){for(const k of chiavi){const h=Object.keys(o).find(x=>x.startsWith(k));if(h&&o[h]!==''&&o[h]!=null)return o[h];}return '';}
+function xLivello(tipo,l){const s=xNorm(l);if(!s)return '';
+  if(tipo==='ANTINCENDIO'){if(/(iii|3|alto)/.test(s))return 'LIVELLO III';if(/(ii|2|medio)/.test(s))return 'LIVELLO II';return 'LIVELLO I';}
+  if(tipo==='PRIMO SOCCORSO'){return /\ba\b|gruppo a$/.test(s)||s==='a'?'GRUPPO A':'GRUPPO B';}
+  if(/alto/.test(s))return 'ALTO';if(/medio/.test(s))return 'MEDIO';if(/basso/.test(s))return 'BASSO';return String(l).toUpperCase();}
+function xScad(data,anni,scad,def){if(scad)return {anni:anni||'',scad};const a=anni||(def?String(def):'');return {anni:a,scad:(data&&a)?addYears(data,a):''};}
+
+async function importaExcel(event){
+  const file=event.target.files[0]; event.target.value=''; if(!file) return;
+  const btn=document.getElementById('btnImportaXls'); const orig=btn.innerHTML; btn.innerHTML='⏳ Lettura del file…'; btn.disabled=true;
+  try{
+    await caricaSheetJS();
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellFormula:true});
+    const ris=elaboraExcel(wb,true);
+    if(!ris.tot){alert('Nel file non ho trovato dati da importare.\n\nUsa il modello scaricabile da questa pagina e compila i fogli a partire dalla riga 3 (la riga 2 è un esempio).');return;}
+    let msg='Ecco cosa verrà importato:\n\n'+ris.riepilogo.join('\n');
+    if(ris.avvisi.length) msg+='\n\n⚠️ Righe saltate ('+ris.avvisi.length+'):\n'+ris.avvisi.slice(0,12).join('\n')+(ris.avvisi.length>12?'\n…e altre '+(ris.avvisi.length-12):'');
+    msg+='\n\nNessun dato esistente viene cancellato'+(SYNC.ready?'; la modifica sarà visibile a tutti i colleghi':'')+'. Procedere?';
+    if(!confirm(msg)) return;
+    elaboraExcel(wb,false);
+    saveDb(); renderSidebar(); refreshUI&&refreshUI();
+    btn.innerHTML='✅ Importazione completata'; setTimeout(()=>{btn.innerHTML=orig;},3500);
+    alert('✅ Importazione completata.\n\n'+ris.riepilogo.join('\n'));
+  }catch(err){ console.error(err); alert('❌ Non riesco a leggere il file: '+(err.message||err)+'\n\nAssicurati che sia un file Excel (.xlsx) creato dal modello.'); }
+  finally{ btn.disabled=false; if(btn.innerHTML.startsWith('⏳')) btn.innerHTML=orig; }
+}
+
+// prova=true: calcola solo il riepilogo senza toccare i dati
+function elaboraExcel(wb,prova){
+  const dati=prova?JSON.parse(JSON.stringify(db.aziende)):db.aziende;
+  const cnt={azN:0,azA:0,dipN:0,dipA:0,fig:0,doc:0,for:0,ido:0,dup:0}; const avvisi=[]; const toccate=new Set();
+  const esempio=n=>/^esempio\b/.test(xNorm(n));
+  const trovaAz=(nome,piva,crea)=>{
+    const kk=t=>normTxt(t).replace(/[^a-z0-9]/g,''),k=kk(nome); let c=dati.find(a=>kk(a.nome)===k)||(piva?dati.find(a=>a.piva&&xNorm(a.piva)===xNorm(piva)):null);
+    if(!c&&crea){c={id:genId(),nome:xTxt(nome),piva:'',settore:'',email:'',referente:'',sedeLegale:'',sedeOperativa:'',note:'',dipendenti:[],formazione:[],idoneitaMedica:[],altriCorsi:[]};dati.push(c);cnt.azN++;}
+    if(c) toccate.add(c.id); return c;};
+  const trovaDip=(c,cogn,nome,cf,crea)=>{
+    c.dipendenti=c.dipendenti||[]; const CF=xTxt(cf).toUpperCase();
+    let d=CF?c.dipendenti.find(x=>xTxt(x.codiceFiscale).toUpperCase()===CF):null;
+    if(!d&&cogn&&nome) d=c.dipendenti.find(x=>xNorm(x.cognome)===xNorm(cogn)&&xNorm(x.nome)===xNorm(nome));
+    if(!d&&crea&&cogn&&nome){d={id:genId(),nome:xTxt(nome),cognome:xTxt(cogn),mansione:'',codiceFiscale:CF,dataAssunzione:'',attivo:true,note:''};c.dipendenti.push(d);cnt.dipN++;}
+    return d;};
+  const salta=(o,perche)=>avvisi.push(`• ${o._foglio} riga ${o._riga}: ${perche}`);
+  const set=(o,k,v)=>{if(v!==''&&v!=null)o[k]=v;};
+
+  xFoglio(wb,'aziend').forEach(o=>{const nome=xCol(o,'azienda');if(!xTxt(nome)||esempio(nome))return;
+    const esiste=trovaAz(nome,xCol(o,'p iva'),false); const c=esiste||trovaAz(nome,'',true); if(esiste)cnt.azA++;
+    set(c,'piva',xTxt(xCol(o,'p iva')));set(c,'settore',xTxt(xCol(o,'settore')));set(c,'email',xTxt(xCol(o,'email')));set(c,'referente',xTxt(xCol(o,'referente')));
+    set(c,'sedeLegale',xTxt(xCol(o,'sede legale')));set(c,'sedeOperativa',xTxt(xCol(o,'sede operativa')));set(c,'note',xTxt(xCol(o,'note')));});
+
+  xFoglio(wb,'dipend').forEach(o=>{const az=xCol(o,'azienda');if(!xTxt(az)||esempio(az))return;
+    const cogn=xTxt(xCol(o,'cognome')),nome=xTxt(xCol(o,'nome'));if(!cogn||!nome){salta(o,'manca cognome o nome');return;}
+    const c=trovaAz(az,'',true); const prima=cnt.dipN; const d=trovaDip(c,cogn,nome,xCol(o,'codice fiscale'),true); if(cnt.dipN===prima)cnt.dipA++;
+    set(d,'codiceFiscale',xTxt(xCol(o,'codice fiscale')).toUpperCase());set(d,'mansione',xTxt(xCol(o,'mansione')));set(d,'dataAssunzione',xData(xCol(o,'data assunzione')));set(d,'note',xTxt(xCol(o,'note')));
+    const f=xNorm(xCol(o,'in forza'));if(f)d.attivo=!/^(no|n|0|false)$/.test(f);});
+
+  xFoglio(wb,'figur').forEach(o=>{const az=xCol(o,'azienda');if(!xTxt(az)||esempio(az))return;
+    const r=xNorm(xCol(o,'ruolo'));const key=/rspp/.test(r)?'rspp':/prepost/.test(r)?'preposto':/rls/.test(r)?'rls':/medic/.test(r)?'medicoCompetente':'';
+    if(!key){salta(o,'ruolo non riconosciuto (usa RSPP, Preposto, RLS o Medico competente)');return;}
+    const nomin=xTxt(xCol(o,'nominativo'));if(!nomin){salta(o,'manca il nominativo');return;}
+    const c=trovaAz(az,'',true),cfg=PERS_CFG[key],f1=cfg.first;
+    const d1=xData(xCol(o,'data nomina')),s1=xScad(d1,xAnni(xCol(o,'anni validita nomina')),xData(xCol(o,'scadenza nomina')),'');
+    let p; if(key==='preposto'){c.preposti=c.preposti||[];p=c.preposti.find(x=>xNorm(x.nome)===xNorm(nomin));if(!p){p={id:genId()};c.preposti.push(p);}} else {p=c[key]=c[key]||{};}
+    p.nome=nomin; set(p,f1+'Data',d1); set(p,f1+'Anni',s1.anni); set(p,f1+'Scadenza',s1.scad); set(p,'note',xTxt(xCol(o,'note')));
+    if(cfg.att){const d2=xData(xCol(o,'data attestato')),s2=xScad(d2,xAnni(xCol(o,'anni validita attestato')),xData(xCol(o,'scadenza attestato')),d2?cfg.defAtt:'');
+      set(p,'attestatoData',d2);set(p,'attestatoAnni',s2.anni);set(p,'attestatoScadenza',s2.scad);}
+    cnt.fig++;});
+
+  const DOCK=[[/^dvr|valutazione dei rischi/,'dvr'],[/riunione/,'verbaleRiunione'],[/evacuazion/,'verbaleEvacuazione'],[/autorizzazione.*emission/,'autorizzazioneEmissioni'],[/monitoraggio.*emission/,'monitoraggioEmissioni']];
+  xFoglio(wb,'document').forEach(o=>{const az=xCol(o,'azienda');if(!xTxt(az)||esempio(az))return;
+    const nome=xTxt(xCol(o,'documento'));if(!nome){salta(o,'manca il nome del documento');return;}
+    const c=trovaAz(az,'',true),k=(DOCK.find(([re])=>re.test(xNorm(nome)))||[])[1];
+    const data=xData(xCol(o,'data')),s=xScad(data,xAnni(xCol(o,'anni')),xData(xCol(o,'scadenza')),data?(k==='dvr'?3:1):''),note=xTxt(xCol(o,'note'));
+    if(k==='dvr'){c.dvr=c.dvr||{};set(c.dvr,'dataRedazione',data);set(c.dvr,'revisione',xTxt(xCol(o,'revisione')));set(c.dvr,'anniValidita',s.anni);set(c.dvr,'scadenza',s.scad);set(c.dvr,'note',note);}
+    else if(k){c[k]=c[k]||{};set(c[k],'data',data);set(c[k],'anniValidita',s.anni);set(c[k],'scadenza',s.scad);set(c[k],'note',note);}
+    else{c.altriDocumenti=c.altriDocumenti||[];let r=c.altriDocumenti.find(x=>xNorm(x.nome)===xNorm(nome)&&(x.data||'')===data);
+      if(!r){r={id:genId(),nome};c.altriDocumenti.push(r);} set(r,'data',data);set(r,'anniValidita',s.anni);set(r,'scadenza',s.scad);set(r,'note',note);}
+    cnt.doc++;});
+
+  xFoglio(wb,'formaz').forEach(o=>{const az=xCol(o,'azienda');if(!xTxt(az)||esempio(az))return;
+    const corso=xTxt(xCol(o,'corso'));if(!corso){salta(o,'manca il corso');return;}
+    const c=trovaAz(az,'',true),d=trovaDip(c,xTxt(xCol(o,'cognome')),xTxt(xCol(o,'nome')),xCol(o,'codice fiscale'),true);
+    if(!d){salta(o,'manca cognome e nome del dipendente');return;}
+    const n=xNorm(corso),tipo=/antincend/.test(n)?'ANTINCENDIO':/primo soccorso/.test(n)?'PRIMO SOCCORSO':/specific/.test(n)?'FORMAZIONE SPECIFICA':'';
+    const dc=xData(xCol(o,'data corso')),s=xScad(dc,xAnni(xCol(o,'anni')),xData(xCol(o,'scadenza')),dc?(tipo?defAnni(tipo):5):''),note=xTxt(xCol(o,'note'));
+    if(tipo){c.formazione=c.formazione||[];const lv=xLivello(tipo,xCol(o,'livello'));
+      if(c.formazione.some(f=>f.dipendenteId===d.id&&f.tipo===tipo&&(f.dataCorso||'')===dc)){cnt.dup++;return;}
+      c.formazione.push({id:genId(),tipo,dipendenteId:d.id,livello:lv||(tipo==='ANTINCENDIO'?'LIVELLO I':tipo==='PRIMO SOCCORSO'?'GRUPPO B':'BASSO'),dataCorso:dc,anniValidita:s.anni,scadenza:s.scad,note});}
+    else{c.altriCorsi=c.altriCorsi||[];
+      if(c.altriCorsi.some(f=>f.dipendenteId===d.id&&xNorm(f.nome)===n&&(f.dataCorso||'')===dc)){cnt.dup++;return;}
+      c.altriCorsi.push({id:genId(),dipendenteId:d.id,nome:corso,dataCorso:dc,anniValidita:s.anni,scadenza:s.scad,note});}
+    cnt.for++;});
+
+  xFoglio(wb,'idonei').forEach(o=>{const az=xCol(o,'azienda');if(!xTxt(az)||esempio(az))return;
+    const c=trovaAz(az,'',true),d=trovaDip(c,xTxt(xCol(o,'cognome')),xTxt(xCol(o,'nome')),xCol(o,'codice fiscale'),true);
+    if(!d){salta(o,'manca cognome e nome del dipendente');return;}
+    const dv=xData(xCol(o,'data visita')),s=xScad(dv,xAnni(xCol(o,'anni')),xData(xCol(o,'scadenza')),dv?2:'');
+    c.idoneitaMedica=c.idoneitaMedica||[];
+    if(c.idoneitaMedica.some(i=>i.dipendenteId===d.id&&(i.dataVisita||'')===dv)){cnt.dup++;return;}
+    c.idoneitaMedica.push({id:genId(),dipendenteId:d.id,dataVisita:dv,anniValidita:s.anni,scadenza:s.scad,note:xTxt(xCol(o,'note'))});cnt.ido++;});
+
+  const R=[];
+  if(toccate.size) R.push(`🏢 Aziende: ${toccate.size}`+(cnt.azN?` (${cnt.azN} nuove)`:''));
+  if(cnt.dipN||cnt.dipA) R.push(`👤 Dipendenti: ${cnt.dipN} nuovi`+(cnt.dipA?`, ${cnt.dipA} aggiornati`:''));
+  if(cnt.fig) R.push(`🛡️ Figure (RSPP, preposti, RLS, medico): ${cnt.fig}`);
+  if(cnt.doc) R.push(`📁 Documenti: ${cnt.doc}`);
+  if(cnt.for) R.push(`🎓 Corsi di formazione: ${cnt.for}`);
+  if(cnt.ido) R.push(`🩺 Idoneità mediche: ${cnt.ido}`);
+  if(cnt.dup) R.push(`↩️ Già presenti e saltati: ${cnt.dup}`);
+  return {riepilogo:R,avvisi,tot:toccate.size};
 }
 
 // ELIMINA AZIENDA
