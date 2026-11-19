@@ -300,7 +300,7 @@ def leggi(path):
             elif re.search(r'(?i)amministrator|datore', txt): col_dat |= cols
     visti = {}; prec = ''
     tutto_doc = ' '.join(p.text for p in d.paragraphs)
-    rosso_rinnovo = bool(re.search(r'(?i)rosso\W{0,3}\s*(da\s+)?rinnov', tutto_doc))
+    rosso_rinnovo = bool(re.search(r'(?i)rosso\W{0,3}\s*((da\s+)?rinnov|(att\.?\s*)?(in\s+)?scaden)', tutto_doc))
     datore_n = set(parole(az.get('datore', '')))
     liv_ateco = rischio(az.get('settore', ''))
     head_prec = None
@@ -318,7 +318,7 @@ def leggi(path):
             sede = ('Sede ' + pm[1].title()) if pm else ''
             col = lambda *ks: next((j for j, h in enumerate(head) for k in ks if h.startswith(k)), None)
             iN = col('nominativ'); iCF = col('codic'); iDN = col('datadinascita'); iLN = col('luogodinascita', 'logodinascita')
-            iDA = col('dataassunzione', 'datainizio'); iM = col('mansione'); iF = col('form'); iI = col('inform'); iD = col('dpi'); iV = col('visit')
+            iDA = col('dataassunzione', 'datainizio'); iM = col('mansione'); iF = col('form'); iI = col('inform'); iD = col('dpi'); iV = col('visit'); iH = col('haccp')
             liv = rischio(' '.join(head[iF:iF + 1])) if iF is not None else ''
             liv = liv or liv_ateco or 'Rischio alto'
             dup_tab = []
@@ -339,8 +339,9 @@ def leggi(path):
                 cells = [None] * offset + list(tb.rows[k].cells)
                 cl = colori(cells[iN]) if cells[iN] is not None else set()
                 tutti = set().union(*[colori(c) for c in cells if c is not None])
-                attivo = 'NO' if any((rosso(c) and not rosso_rinnovo) or c in col_off for c in cl) else 'SI'
-                if rosso_rinnovo and any(rosso(c) for c in cl):
+                riga_rossa = sum(1 for c in cells if c is not None and any(rosso(x) for x in colori(c))) >= 0.7 * len([c for c in cells if c is not None])
+                attivo = 'NO' if any((rosso(c) and (not rosso_rinnovo or riga_rossa)) or c in col_off for c in cl) else 'SI'
+                if rosso_rinnovo and any(rosso(c) for c in cl) and not riga_rossa:
                     AVVISI.append(f'{ctx}: {n} è in rosso, ma in questo Word il rosso significa "da rinnovare": lasciato in forza')
                 mans0 = clean(g(iM)).strip('/ ')
                 datore = any(giallo(c) or c in col_dat for c in cl) or bool(re.match(r'(?i)^(datore|amminis)', mans0))
@@ -373,6 +374,8 @@ def leggi(path):
                 R['dip'].append([cog, nom, cf, mans, dte(g(iDA)) or assunz.get(' '.join(sorted(parole(n)))), attivo, '; '.join(note)])
                 if fd: R['for'].append([cog, nom, cf, 'Formazione specifica', liv, fd, 5, ('Formazione lavoratori' + (' — ' + fx if fx else ''))])
                 elif senza_f: R['for'].append([cog, nom, cf, 'Formazione specifica', liv, None, 5, 'DATA DA INSERIRE; Formazione lavoratori — ' + fx])
+                hv = g(iH) if iH is not None else ''; hd = dte(hv)
+                if hd: R['for'].append([cog, nom, cf, 'HACCP', '', hd, 3, resto_testo(hv).strip('/- ')])
                 vv = g(iV); vd = dte(vv)
                 if vd:
                     ma = re.search(r'(\d+)\s*ANN', vv.upper())
