@@ -53,6 +53,8 @@ create table if not exists public.profili (
 
 alter table public.aziende add column if not exists scadenze jsonb;           -- elenco scadenze calcolato dall'app
 alter table public.profili add column if not exists avvisi_email boolean not null default true;
+-- indirizzi a cui inviare gli avvisi interni (separati da virgola); vuoto = email dell'account
+alter table public.profili add column if not exists email_avvisi text;
 alter table public.profili add column if not exists cognome   text;
 alter table public.profili add column if not exists piva      text;
 alter table public.profili add column if not exists indirizzo text;
@@ -159,10 +161,30 @@ $$;
 
 drop function if exists public.mio_stato();
 create or replace function public.mio_stato()
-returns table (email text, nome text, piano text, scadenza date, admin boolean, avvisi_email boolean)
+returns table (email text, nome text, piano text, scadenza date, admin boolean, avvisi_email boolean, email_avvisi text)
 language sql security definer stable set search_path = public as $$
-  select p.email, p.nome, p.piano, p.scadenza, p.admin, p.avvisi_email from public.profili p where p.user_id = auth.uid();
+  select p.email, p.nome, p.piano, p.scadenza, p.admin, p.avvisi_email, p.email_avvisi from public.profili p where p.user_id = auth.uid();
 $$;
+
+-- imposta gli indirizzi per gli avvisi interni (max 5, separati da virgola); stringa vuota = email dell'account
+create or replace function public.imposta_email_avvisi(indirizzi text)
+returns text
+language plpgsql security definer set search_path = public as $$
+declare v text; lista text[] := '{}'; e text;
+begin
+  foreach e in array regexp_split_to_array(coalesce(indirizzi, ''), '[,;\s]+') loop
+    e := lower(trim(e));
+    if e = '' then continue; end if;
+    if e !~ '^[^@\s]+@[^@\s]+\.[a-z]{2,}$' then raise exception 'Email non valida: %', e; end if;
+    if not e = any(lista) then lista := lista || e; end if;
+  end loop;
+  if array_length(lista, 1) > 5 then raise exception 'Massimo 5 indirizzi'; end if;
+  v := nullif(array_to_string(lista, ', '), '');
+  update public.profili set email_avvisi = v where user_id = auth.uid();
+  return v;
+end $$;
+revoke all on function public.imposta_email_avvisi(text) from public, anon;
+grant execute on function public.imposta_email_avvisi(text) to authenticated;
 
 create or replace function public.imposta_avvisi(attivi boolean)
 returns void
@@ -584,7 +606,7 @@ begin
         <table style="border-collapse:collapse;width:100%%;"><tr style="background:#f3f4f6;text-align:left;">
         <th style="%s">Azienda</th><th style="%s">Scadenza</th><th style="%s">Persona</th><th style="%s">Data</th><th style="%s">Stato</th></tr>%s</table>
         <p style="margin:18px 0 6px;"><a href="%s" style="background:#b8571d;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Apri il gestionale</a></p>
-        <p style="font-size:11px;color:#6b7280;margin-top:16px;">Ogni scadenza viene segnalata a 30 giorni, a 7 giorni e quando scade. Puoi disattivare queste email da ⚙️ Account e colleghi.</p>
+        <p style="font-size:11px;color:#6b7280;margin-top:16px;">Ogni scadenza viene segnalata a 30 giorni, a 7 giorni e quando scade. Puoi cambiare gli indirizzi o disattivare queste email da ⚙️ Account e colleghi.</p>
         </div></div>', public.st81_html(sp.nome), n, td, td, td, td, td, righe, coalesce(url, '#'));
       if sp.telegram_chat_id is not null then
         perform public.st81_invia_telegram(sp.telegram_chat_id,
@@ -594,10 +616,13 @@ begin
       end if;
       if email_ok then
       for dest in
-        select u.email from public.membri m
+        select distinct lower(trim(x)) as email from public.membri m
         join auth.users u on u.id = m.user_id
         join public.profili p on p.user_id = m.user_id
-        where m.spazio_id = sp.id and p.avvisi_email and u.email is not null
+        cross join lateral unnest(case when coalesce(trim(p.email_avvisi), '') <> ''
+                                       then regexp_split_to_array(p.email_avvisi, '[,;\s]+')
+                                       else array[u.email] end) x
+        where m.spazio_id = sp.id and p.avvisi_email and coalesce(trim(x), '') <> ''
       loop
         perform public.st81_invia_email(dest.email, ogg, html);
       end loop;

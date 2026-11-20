@@ -1875,7 +1875,10 @@ async function apriAccount(){
   <div class="fg"><label>Avvisi email</label>
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;">
     <input type="checkbox" id="acc_avvisi" style="width:auto;" ${(SYNC.me&&SYNC.me.avvisi_email!==false)?'checked':''} onchange="salvaAvvisi(this.checked)">
-    Ricevi ogni mattina un'email con le scadenze a 30 giorni, a 7 giorni e scadute</label></div>
+    Ricevi ogni mattina un'email con le scadenze a 30 giorni, a 7 giorni e scadute</label>
+    <div style="margin-top:10px;font-size:12px;color:var(--text2);">Indirizzi a cui inviare questi avvisi (puoi metterne fino a 5, separati da virgola). Se lasci vuoto arrivano a <strong>${escH(SYNC.user.email)}</strong>.</div>
+    <div style="display:flex;gap:8px;margin-top:6px;"><input id="acc_emailavv" type="text" placeholder="${escH(SYNC.user.email)}" value="${escH((SYNC.me&&SYNC.me.email_avvisi)||'')}" style="flex:1;"><button class="btn btn-secondary" onclick="salvaEmailAvvisi()">Salva</button></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px;">Vale solo per gli avvisi interni: le email di riepilogo alle aziende continuano ad andare all'email di ciascuna azienda.</div></div>
   ${tit?`<div class="fg"><label>Invio automatico alle aziende</label>
     <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;">
     <input type="checkbox" id="acc_invioaz" style="width:auto;margin-top:3px;" ${(SYNC.invioAz&&SYNC.invioAz.attivo)?'checked':''} onchange="salvaInvioAziende(this.checked)">
@@ -1987,6 +1990,13 @@ async function salvaAvvisi(on){
   const {error}=await sb.rpc('imposta_avvisi',{attivi:on});
   if(error){ accMsg(erroreIT(error)); document.getElementById('acc_avvisi').checked=!on; return; }
   if(SYNC.me) SYNC.me.avvisi_email=on; accMsg(on?'Avvisi email attivati.':'Avvisi email disattivati.',true);
+}
+async function salvaEmailAvvisi(){
+  const el=document.getElementById('acc_emailavv'); const v=el.value.trim();
+  const {data,error}=await sb.rpc('imposta_email_avvisi',{indirizzi:v});
+  if(error){ accMsg(erroreIT(error)); return; }
+  if(SYNC.me) SYNC.me.email_avvisi=data||null; el.value=data||'';
+  accMsg(data?('Gli avvisi arriveranno a: '+data):('Gli avvisi arriveranno a '+SYNC.user.email),true);
 }
 async function cambiaPassword(){
   const p=document.getElementById('acc_pw').value; if(p.length<6){ accMsg('La password deve avere almeno 6 caratteri.'); return; }
